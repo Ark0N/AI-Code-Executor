@@ -68,6 +68,18 @@ class File(Base):
     execution: Mapped["CodeExecution"] = relationship(back_populates="files")
 
 
+class ExecutionLog(Base):
+    """Execution feedback/log messages that persist in chat (e.g., '🐳 Creating Docker container...')"""
+    __tablename__ = "execution_logs"
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    conversation_id: Mapped[int] = mapped_column(ForeignKey("conversations.id"))
+    message_id: Mapped[Optional[int]] = mapped_column(ForeignKey("messages.id"), nullable=True)
+    message: Mapped[str] = mapped_column(Text)
+    level: Mapped[str] = mapped_column(String(20), default="info")  # info, success, error
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 class Settings(Base):
     """Application settings for Docker resource limits"""
     __tablename__ = "settings"

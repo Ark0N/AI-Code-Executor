@@ -15,7 +15,7 @@ from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, delete
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
@@ -24,7 +24,7 @@ import json
 import asyncio
 import docker
 
-from backend.database import init_db, get_session, Conversation, Message, CodeExecution, File, Settings
+from backend.database import init_db, get_session, Conversation, Message, CodeExecution, File, Settings, ExecutionLog
 from backend.anthropic_client import claude_client
 from backend.ollama_client import OllamaClient
 from backend.code_executor import executor, CodeExecutor
@@ -162,6 +162,17 @@ async def execute_code_blocks(
     async def send_feedback(feedback_data):
         if feedback_queue:
             await feedback_queue.put(feedback_data)
+        # Save feedback to database for persistence
+        if feedback_data.get('type') == 'feedback':
+            log_entry = ExecutionLog(
+                conversation_id=conversation_id,
+                message_id=message_id,
+                message=feedback_data.get('message', ''),
+                level=feedback_data.get('level', 'info')
+            )
+            db.add(log_entry)
+            # Use flush to persist but keep in same transaction
+            await db.flush()
     
     for language, code in code_blocks:
         if language.lower() in ["python", "py", "javascript", "js", "node", "bash", "sh", "shell"]:
@@ -305,7 +316,7 @@ async def get_conversation(
     conversation_id: int,
     db: AsyncSession = Depends(get_session)
 ):
-    """Get conversation with all messages and executions"""
+    """Get conversation with all messages, executions, and logs"""
     result = await db.execute(
         select(Conversation).where(Conversation.id == conversation_id)
     )
@@ -332,6 +343,14 @@ async def get_conversation(
             .order_by(CodeExecution.timestamp)
         )
         executions = result.scalars().all()
+        
+        # Get execution logs for this message
+        result = await db.execute(
+            select(ExecutionLog)
+            .where(ExecutionLog.message_id == msg.id)
+            .order_by(ExecutionLog.timestamp)
+        )
+        logs = result.scalars().all()
         
         formatted_executions = []
         for exec in executions:
@@ -360,12 +379,24 @@ async def get_conversation(
                 ]
             })
         
+        # Format execution logs
+        formatted_logs = [
+            {
+                "id": log.id,
+                "message": log.message,
+                "level": log.level,
+                "timestamp": log.timestamp.isoformat()
+            }
+            for log in logs
+        ]
+        
         formatted_messages.append({
             "id": msg.id,
             "role": msg.role,
             "content": msg.content,
             "timestamp": msg.timestamp.isoformat(),
-            "executions": formatted_executions
+            "executions": formatted_executions,
+            "execution_logs": formatted_logs
         })
     
     return {
@@ -395,7 +426,12 @@ async def delete_conversation(
     # Cleanup Docker container
     executor.cleanup_container(conversation_id)
     
-    # Delete from database
+    # Delete execution logs for this conversation
+    await db.execute(
+        delete(ExecutionLog).where(ExecutionLog.conversation_id == conversation_id)
+    )
+    
+    # Delete from database (cascades to messages, executions, files)
     await db.delete(conversation)
     await db.commit()
     

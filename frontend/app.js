@@ -1735,6 +1735,13 @@ const Chat = {
       conversation.messages.forEach(msg => {
         this.appendMessage(msg.role, msg.content, msg.id);
         
+        // Render execution logs (feedback messages like "🐳 Creating Docker container...") before executions
+        if (msg.execution_logs && msg.execution_logs.length > 0) {
+          msg.execution_logs.forEach(log => {
+            this.appendFeedback(log.message, log.level);
+          });
+        }
+        
         // Render associated executions
         if (msg.executions) {
           msg.executions.forEach(exec => {
