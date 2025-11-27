@@ -232,6 +232,31 @@ async def get_providers():
                 {"id": "claude-sonnet-3-5-20241022", "name": "Claude Sonnet 3.5"},
                 {"id": "claude-haiku-3-5-20241022", "name": "Claude Haiku 3.5"}
             ]
+        },
+        {
+            "id": "openai",
+            "name": "OpenAI (GPT)",
+            "available": True,
+            "models": [
+                {"id": "gpt-5.1", "name": "GPT-5.1"},
+                {"id": "gpt-5", "name": "GPT-5"},
+                {"id": "gpt-5-mini", "name": "GPT-5 Mini"},
+                {"id": "gpt-4.1", "name": "GPT-4.1"},
+                {"id": "gpt-4.1-mini", "name": "GPT-4.1 Mini"},
+                {"id": "gpt-4o", "name": "GPT-4o"},
+                {"id": "gpt-4o-mini", "name": "GPT-4o Mini"}
+            ]
+        },
+        {
+            "id": "gemini",
+            "name": "Google (Gemini)",
+            "available": True,
+            "models": [
+                {"id": "gemini-2.5-pro", "name": "Gemini 2.5 Pro"},
+                {"id": "gemini-2.5-flash", "name": "Gemini 2.5 Flash"},
+                {"id": "gemini-2.5-flash-lite", "name": "Gemini 2.5 Flash-Lite"},
+                {"id": "gemini-2.0-flash", "name": "Gemini 2.0 Flash"}
+            ]
         }
     ]
     
@@ -1577,9 +1602,17 @@ class AIClientManager:
             'claude-opus-4': 'claude-opus-4-20250514',
             'claude-sonnet-3.5': 'claude-3-5-sonnet-20241022',
             'claude-haiku-3.5': 'claude-3-5-haiku-20241022',
-            'gpt-4-turbo-preview': 'gpt-4-turbo',
-            'gpt-4-32k': 'gpt-4',
-            'gpt-3.5-turbo-16k': 'gpt-3.5-turbo'
+            # Legacy OpenAI models
+            'gpt-4-turbo-preview': 'gpt-4o',
+            'gpt-4': 'gpt-4o',
+            'gpt-4-32k': 'gpt-4o',
+            'gpt-3.5-turbo': 'gpt-4o-mini',
+            'gpt-3.5-turbo-16k': 'gpt-4o-mini',
+            # Legacy Gemini models
+            'gemini-pro': 'gemini-2.5-flash',
+            'gemini-pro-vision': 'gemini-2.5-flash',
+            'gemini-1.5-pro': 'gemini-2.5-pro',
+            'gemini-1.5-flash': 'gemini-2.5-flash'
         }
         
         # Map old model names to new ones

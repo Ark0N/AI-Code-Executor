@@ -7,7 +7,7 @@
 
 <br/>
 
-<img src="https://readme-typing-svg.demolab.com?font=DM+Sans&size=20&duration=4000&pause=500&color=888888&center=true&vCenter=true&width=500&lines=Execute+code+with+AI+assistance;in+secure+Docker+containers" alt="Subtitle"/>
+<img src="https://readme-typing-svg.demolab.com?font=DM+Sans&size=20&duration=4000&pause=500&color=888888&center=true&vCenter=true&width=600&lines=Execute+code+with+AI+assistance;in+secure+Docker+containers;Export+and+share+your+environments" alt="Subtitle"/>
 
 <br/><br/>
 
@@ -15,14 +15,15 @@
 <img src="https://img.shields.io/badge/🐳_Docker_Isolated-0891b2?style=for-the-badge&labelColor=0a0a0b" alt="Isolated"/>
 <img src="https://img.shields.io/badge/⚡_Auto--Execute-22d3ee?style=for-the-badge&labelColor=0a0a0b" alt="Powerful"/>
 <img src="https://img.shields.io/badge/🔧_Auto--Fix_Loop-0891b2?style=for-the-badge&labelColor=0a0a0b" alt="Auto-Fix"/>
-<img src="https://img.shields.io/badge/🖥️_Full_Terminal-22d3ee?style=for-the-badge&labelColor=0a0a0b" alt="Terminal"/>
+<img src="https://img.shields.io/badge/📦_Export_Images-22d3ee?style=for-the-badge&labelColor=0a0a0b" alt="Export"/>
+<img src="https://img.shields.io/badge/🖥️_Full_Terminal-0891b2?style=for-the-badge&labelColor=0a0a0b" alt="Terminal"/>
 
 <br/><br/>
 
 <!-- Provider badges -->
 <img src="https://img.shields.io/badge/Claude_4-22d3ee?style=flat-square&logo=anthropic&logoColor=white&labelColor=0a0a0b" alt="Claude"/>
-<img src="https://img.shields.io/badge/GPT--4o-22d3ee?style=flat-square&logo=openai&logoColor=white&labelColor=0a0a0b" alt="GPT-4"/>
-<img src="https://img.shields.io/badge/Gemini-22d3ee?style=flat-square&logo=google&logoColor=white&labelColor=0a0a0b" alt="Gemini"/>
+<img src="https://img.shields.io/badge/GPT--5.1-22d3ee?style=flat-square&logo=openai&logoColor=white&labelColor=0a0a0b" alt="GPT-5.1"/>
+<img src="https://img.shields.io/badge/Gemini_2.5-22d3ee?style=flat-square&logo=google&logoColor=white&labelColor=0a0a0b" alt="Gemini"/>
 <img src="https://img.shields.io/badge/Ollama-22d3ee?style=flat-square&logoColor=white&labelColor=0a0a0b" alt="Ollama"/>
 <img src="https://img.shields.io/badge/Whisper_Voice-22d3ee?style=flat-square&logoColor=white&labelColor=0a0a0b" alt="Whisper"/>
 <img src="https://img.shields.io/badge/FREE_Local_AI-10b981?style=flat-square&labelColor=0a0a0b" alt="Free"/>
@@ -38,11 +39,13 @@
 &nbsp;
 <a href="#-docker-containers"><img src="https://img.shields.io/badge/🐳_Docker-0891b2?style=for-the-badge&labelColor=0a0a0b" alt="Docker"/></a>
 &nbsp;
-<a href="#-ai-providers"><img src="https://img.shields.io/badge/🤖_AI_Providers-22d3ee?style=for-the-badge&labelColor=0a0a0b" alt="AI"/></a>
+<a href="#-docker-image-export"><img src="https://img.shields.io/badge/📦_Export-22d3ee?style=for-the-badge&labelColor=0a0a0b" alt="Export"/></a>
 &nbsp;
-<a href="#-auto-fix-system"><img src="https://img.shields.io/badge/🔧_Auto--Fix-0891b2?style=for-the-badge&labelColor=0a0a0b" alt="Auto-Fix"/></a>
+<a href="#-ai-providers"><img src="https://img.shields.io/badge/🤖_AI_Providers-0891b2?style=for-the-badge&labelColor=0a0a0b" alt="AI"/></a>
 &nbsp;
-<a href="#%EF%B8%8F-configuration"><img src="https://img.shields.io/badge/⚙️_Config-22d3ee?style=for-the-badge&labelColor=0a0a0b" alt="Config"/></a>
+<a href="#-auto-fix-system"><img src="https://img.shields.io/badge/🔧_Auto--Fix-22d3ee?style=for-the-badge&labelColor=0a0a0b" alt="Auto-Fix"/></a>
+&nbsp;
+<a href="#%EF%B8%8F-configuration"><img src="https://img.shields.io/badge/⚙️_Config-0891b2?style=for-the-badge&labelColor=0a0a0b" alt="Config"/></a>
 
 </div>
 
@@ -82,6 +85,7 @@
 ✅ Auto-fixed (up to 10x)
 ✅ Results displayed
 ✅ Full terminal access
+✅ Export & share containers
 
 ⏱️ ~30 seconds per task
 ```
@@ -120,6 +124,7 @@ When you start a new chat, a **dedicated Docker container** is automatically cre
 | 💻 **Full Bash Shell** | Complete Linux environment |
 | 🌐 **Internet Access** | Download packages, fetch data |
 | 📁 **Persistent Files** | Files persist during conversation |
+| 📦 **Exportable** | Save entire container as portable image |
 
 #### 🎛️ Resource Limits (Configurable)
 
@@ -159,6 +164,46 @@ drwxr-xr-x 1 root root 4096 Jan 15 10:30 .
 - 📜 **Scrollback history** - Review previous commands
 - 🔄 **Persistent session** - Terminal stays open while chatting
 
+### 📦 Docker Image Export
+
+**Take your work anywhere** - Export any conversation's container as a portable Docker image.
+
+Built something cool? Export it and run it on another machine, share it with colleagues, or keep it as a backup.
+
+#### How It Works
+
+1. Click the 🐳 button on any conversation
+2. Confirm the export
+3. Download the `.tar` file from the Images panel
+
+#### On Another Machine
+
+```bash
+# Load the exported image
+docker load < my-project_2025-01-15_143052.tar
+
+# Run it
+docker run -it my-project_2025-01-15_143052:latest bash
+
+# You're back in your exact environment!
+root@container:/workspace$ ls
+script.py  data.csv  results/
+```
+
+#### Features
+
+| Feature | Description |
+|---------|-------------|
+| 🐳 **One-Click Export** | Export button on every conversation |
+| 📁 **Image Manager** | View, download, delete exported images |
+| ⚙️ **Custom Path** | Configure export location in Settings |
+| 📦 **Full Environment** | Includes all files, packages, and state |
+
+#### Configuration
+
+Set custom export path in Settings → Docker → Image Export Path  
+Or via environment variable: `DOCKER_EXPORT_PATH=./docker_images_exported`
+
 <br/>
 
 ---
@@ -175,11 +220,12 @@ drwxr-xr-x 1 root root 4096 Jan 15 10:30 .
 
 **🟣 Anthropic**
 
-<img src="https://img.shields.io/badge/Claude_4_Opus-6366f1?style=for-the-badge&labelColor=0a0a0b" alt="Claude"/>
+<img src="https://img.shields.io/badge/Claude_4-6366f1?style=for-the-badge&labelColor=0a0a0b" alt="Claude"/>
 
 Claude 4 Opus
 Claude 4 Sonnet
-Claude 4 Haiku
+Claude 3.5 Sonnet
+Claude 3.5 Haiku
 
 *Best reasoning*
 
@@ -188,23 +234,26 @@ Claude 4 Haiku
 
 **🟢 OpenAI**
 
-<img src="https://img.shields.io/badge/GPT--4o-10a37f?style=for-the-badge&labelColor=0a0a0b" alt="GPT"/>
+<img src="https://img.shields.io/badge/GPT--5.1-10a37f?style=for-the-badge&labelColor=0a0a0b" alt="GPT"/>
 
-GPT-4o
-GPT-4 Turbo
-GPT-3.5 Turbo
+GPT-5.1
+GPT-5 / Mini
+GPT-4.1 / Mini
+GPT-4o / Mini
 
-*Most popular*
+*Latest & greatest*
 
 </td>
 <td width="20%" align="center">
 
 **🔵 Google**
 
-<img src="https://img.shields.io/badge/Gemini-4285f4?style=for-the-badge&labelColor=0a0a0b" alt="Gemini"/>
+<img src="https://img.shields.io/badge/Gemini_2.5-4285f4?style=for-the-badge&labelColor=0a0a0b" alt="Gemini"/>
 
-Gemini 1.5 Pro
-Gemini 1.5 Flash
+Gemini 2.5 Pro
+Gemini 2.5 Flash
+Gemini 2.5 Flash-Lite
+Gemini 2.0 Flash
 
 *Fast & affordable*
 
@@ -419,6 +468,7 @@ AUTO_FIX_MAX_ATTEMPTS=10               # Retry attempts (1-20)
 DOCKER_CPU_CORES=2                     # 1-16 cores
 DOCKER_MEMORY_LIMIT=8g                 # 512m-32g RAM
 DOCKER_STORAGE_LIMIT=10g               # 1g-100g disk
+DOCKER_EXPORT_PATH=./docker_images_exported  # Where exported images are saved
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 📝 PROMPTS (Customize AI behavior)
@@ -480,9 +530,7 @@ PORT=8000
 - 📱 Touch-optimized interface
 - 🍔 Collapsible sidebar
 - ⌨️ Keyboard-aware input area
-- 🖥️ Resizable terminal window
 - 🎤 Voice input support
-- 📁 File management
 
 <br clear="left"/>
 
@@ -497,6 +545,12 @@ PORT=8000
 ```bash
 # Clone
 git clone https://github.com/Ark0N/AI-Code-Executor.git
+
+or
+
+wget https://github.com/Ark0N/AI-Code-Executor/archive/refs/heads/main.zip
+unzip main.zip
+
 cd AI-Code-Executor
 
 # Install (auto-detects OS & container runtime)

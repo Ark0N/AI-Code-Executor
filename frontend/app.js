@@ -1434,17 +1434,21 @@ const Header = {
       
       case 'openai':
         return [
-          { id: 'gpt-4-turbo', name: 'GPT-4 Turbo' },
-          { id: 'gpt-4', name: 'GPT-4' },
+          { id: 'gpt-5.1', name: 'GPT-5.1' },
+          { id: 'gpt-5', name: 'GPT-5' },
+          { id: 'gpt-5-mini', name: 'GPT-5 Mini' },
+          { id: 'gpt-4.1', name: 'GPT-4.1' },
+          { id: 'gpt-4.1-mini', name: 'GPT-4.1 Mini' },
           { id: 'gpt-4o', name: 'GPT-4o' },
-          { id: 'gpt-4o-mini', name: 'GPT-4o Mini' },
-          { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo' }
+          { id: 'gpt-4o-mini', name: 'GPT-4o Mini' }
         ];
       
       case 'gemini':
         return [
-          { id: 'gemini-pro', name: 'Gemini Pro' },
-          { id: 'gemini-pro-vision', name: 'Gemini Pro Vision' }
+          { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' },
+          { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
+          { id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash-Lite' },
+          { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash' }
         ];
       
       case 'ollama':

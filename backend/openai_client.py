@@ -95,9 +95,11 @@ class OpenAIClient:
     def get_available_models(self) -> list:
         """Return list of available OpenAI models"""
         return [
-            "gpt-4-turbo-preview",
-            "gpt-4",
-            "gpt-4-32k",
-            "gpt-3.5-turbo",
-            "gpt-3.5-turbo-16k"
+            "gpt-5.1",
+            "gpt-5",
+            "gpt-5-mini",
+            "gpt-4.1",
+            "gpt-4.1-mini",
+            "gpt-4o",
+            "gpt-4o-mini"
         ]
