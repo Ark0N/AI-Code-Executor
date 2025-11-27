@@ -61,4 +61,5 @@ class WhisperRemoteClient:
             if os.path.exists(wav_path):
                 os.remove(wav_path)
 
-whisper_remote_client = WhisperRemoteClient()
+# Don't create global instance - it will be created on demand by get_whisper_client()
+# whisper_remote_client = WhisperRemoteClient()

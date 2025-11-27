@@ -1,0 +1,92 @@
+# =============================================================================
+# AI Code Executor - Docker Compose Configuration
+# =============================================================================
+# Usage:
+#   docker compose up -d          # Start in background
+#   docker compose logs -f        # View logs
+#   docker compose down           # Stop
+#   docker compose down -v        # Stop and remove volumes
+# =============================================================================
+
+services:
+  ai-code-executor:
+    build:
+      context: .
+      dockerfile: Dockerfile.app
+    container_name: ai-code-executor
+    restart: unless-stopped
+    
+    ports:
+      - "${PORT:-8000}:8000"
+    
+    volumes:
+      # CRITICAL: Mount Docker socket for container management
+      # This allows the app to create code execution containers
+      - /var/run/docker.sock:/var/run/docker.sock
+      
+      # Persist database and exported images
+      - ai-executor-data:/app/data
+      - ai-executor-exports:/app/docker_images_exported
+      
+      # Mount the sandbox Dockerfile so the app can build the execution image
+      - ./Dockerfile:/app/Dockerfile:ro
+    
+    environment:
+      # Server
+      - HOST=0.0.0.0
+      - PORT=8000
+      
+      # Database (persisted in volume)
+      - DATABASE_URL=sqlite+aiosqlite:///./data/conversations.db
+      
+      # Docker settings
+      - DOCKER_EXPORT_PATH=/app/docker_images_exported
+      - DOCKER_CPU_CORES=${DOCKER_CPU_CORES:-2}
+      - DOCKER_MEMORY_LIMIT=${DOCKER_MEMORY_LIMIT:-8g}
+      - DOCKER_STORAGE_LIMIT=${DOCKER_STORAGE_LIMIT:-10g}
+      - DOCKER_EXECUTION_TIMEOUT=${DOCKER_EXECUTION_TIMEOUT:-30}
+      
+      # API Keys (set in .env file or pass directly)
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      
+      # Ollama (optional - for local AI models)
+      # Use host.docker.internal to reach Ollama running on host
+      - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
+      
+      # Whisper (optional - for voice input)
+      - WHISPER_SERVER_URL=${WHISPER_SERVER_URL:-}
+    
+    # Add host.docker.internal for Linux (already works on Mac/Windows)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    
+    # Ensure proper permissions for Docker socket
+    # You may need to adjust this based on your Docker group ID
+    # Run: getent group docker | cut -d: -f3
+    # group_add:
+    #   - "docker"
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+# =============================================================================
+# Volumes for Data Persistence
+# =============================================================================
+volumes:
+  ai-executor-data:
+    name: ai-executor-data
+  ai-executor-exports:
+    name: ai-executor-exports
+
+# =============================================================================
+# Networks (optional - if you need custom networking)
+# =============================================================================
+# networks:
+#   ai-executor-network:
+#     driver: bridge

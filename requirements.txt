@@ -10,4 +10,5 @@ python-dotenv==1.0.0
 docker==7.1.0
 requests==2.32.3
 python-multipart==0.0.6
-openai-whisper
+# openai-whisper is optional - requires PyTorch, use remote Whisper server instead
+# openai-whisper

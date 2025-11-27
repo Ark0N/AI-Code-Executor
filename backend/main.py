@@ -115,6 +115,31 @@ async def shutdown_event():
     executor.cleanup_all_containers()
 
 
+# Health check endpoint for Docker/monitoring
+@app.get("/api/health")
+async def health_check():
+    """Health check endpoint for container orchestration"""
+    try:
+        # Check Docker connectivity
+        docker_ok = False
+        try:
+            executor.client.ping()
+            docker_ok = True
+        except:
+            pass
+        
+        return {
+            "status": "healthy",
+            "docker": "connected" if docker_ok else "disconnected",
+            "version": "1.0.0"
+        }
+    except Exception as e:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "unhealthy", "error": str(e)}
+        )
+
+
 def extract_code_blocks(text: str) -> List[tuple]:
     """
     Extract code blocks from markdown text

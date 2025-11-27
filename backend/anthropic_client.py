@@ -1,17 +1,23 @@
-import anthropic
 import os
 from typing import List, Dict, AsyncGenerator, Optional
 from dotenv import load_dotenv
 
 load_dotenv()
 
+# Try to import anthropic, but make it optional
+try:
+    import anthropic
+    ANTHROPIC_AVAILABLE = True
+except ImportError:
+    ANTHROPIC_AVAILABLE = False
+    anthropic = None
+
 
 class ClaudeClient:
     def __init__(self):
         self.api_key = os.getenv("ANTHROPIC_API_KEY")
-        if not self.api_key:
-            raise ValueError("ANTHROPIC_API_KEY not found in environment variables")
-        self._client: Optional[anthropic.AsyncAnthropic] = None
+        self._client = None
+        self._initialized = False
         
         # Available models
         self.models = {
@@ -22,8 +28,17 @@ class ClaudeClient:
         }
     
     @property
-    def client(self) -> anthropic.AsyncAnthropic:
+    def available(self) -> bool:
+        """Check if Claude client can be used"""
+        return ANTHROPIC_AVAILABLE and bool(self.api_key)
+    
+    @property
+    def client(self):
         """Lazy initialization of the Anthropic client"""
+        if not ANTHROPIC_AVAILABLE:
+            raise RuntimeError("anthropic package is not installed")
+        if not self.api_key:
+            raise RuntimeError("ANTHROPIC_API_KEY not configured. Please add it in Settings.")
         if self._client is None:
             self._client = anthropic.AsyncAnthropic(api_key=self.api_key)
         return self._client
@@ -39,6 +54,10 @@ class ClaudeClient:
         Stream completion from Claude
         Yields text chunks as they arrive
         """
+        if not self.available:
+            yield "Error: Anthropic API key not configured. Please add it in Settings."
+            return
+            
         # Default system prompt from env or hardcoded fallback
         if system_prompt is None:
             system_prompt = os.getenv("SYSTEM_PROMPT",
@@ -49,14 +68,17 @@ class ClaudeClient:
                 "This approach gives the best results for automatic code execution."
             )
         
-        async with self.client.messages.stream(
-            model=model,
-            max_tokens=max_tokens,
-            system=system_prompt,
-            messages=messages
-        ) as stream:
-            async for text in stream.text_stream:
-                yield text
+        try:
+            async with self.client.messages.stream(
+                model=model,
+                max_tokens=max_tokens,
+                system=system_prompt,
+                messages=messages
+            ) as stream:
+                async for text in stream.text_stream:
+                    yield text
+        except Exception as e:
+            yield f"\nError communicating with Anthropic API: {str(e)}"
     
     async def get_completion(
         self,
@@ -68,6 +90,9 @@ class ClaudeClient:
         """
         Get full completion from Claude (non-streaming)
         """
+        if not self.available:
+            return "Error: Anthropic API key not configured. Please add it in Settings."
+            
         # Default system prompt from env or hardcoded fallback
         if system_prompt is None:
             system_prompt = os.getenv("SYSTEM_PROMPT",
@@ -78,13 +103,16 @@ class ClaudeClient:
                 "This approach gives the best results for automatic code execution."
             )
         
-        response = await self.client.messages.create(
-            model=model,
-            max_tokens=max_tokens,
-            system=system_prompt,
-            messages=messages
-        )
-        return response.content[0].text
+        try:
+            response = await self.client.messages.create(
+                model=model,
+                max_tokens=max_tokens,
+                system=system_prompt,
+                messages=messages
+            )
+            return response.content[0].text
+        except Exception as e:
+            return f"Error communicating with Anthropic API: {str(e)}"
     
     def get_available_models(self) -> Dict[str, str]:
         """Return available models"""

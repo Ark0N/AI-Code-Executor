@@ -1,0 +1,65 @@
+# =============================================================================
+# Docker Ignore File
+# =============================================================================
+
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.env
+.venv/
+venv/
+ENV/
+env/
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Database (will be in volume)
+*.db
+*.sqlite
+*.sqlite3
+
+# Exported Docker images (will be in volume)
+docker_images_exported/
+*.tar
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test files
+tests/
+test_*.py
+*_test.py
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Documentation (not needed in container)
+docs/
+*.md
+!README.md
+
+# Other
+*.bak
+*.tmp
+node_modules/

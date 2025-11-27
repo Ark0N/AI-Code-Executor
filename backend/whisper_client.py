@@ -1,4 +1,10 @@
-import whisper
+try:
+    import whisper
+    WHISPER_AVAILABLE = True
+except ImportError:
+    WHISPER_AVAILABLE = False
+    whisper = None
+
 import os
 from typing import Dict
 
@@ -16,9 +22,12 @@ class WhisperClient:
         """
         self.model = None
         self.model_name = model_name
+        self.available = WHISPER_AVAILABLE
     
     def load_model(self):
         """Lazy load model when first needed"""
+        if not WHISPER_AVAILABLE:
+            raise RuntimeError("Whisper is not installed. Use remote Whisper server or install openai-whisper.")
         if self.model is None:
             print(f"[WHISPER] Loading {self.model_name} model...")
             self.model = whisper.load_model(self.model_name)

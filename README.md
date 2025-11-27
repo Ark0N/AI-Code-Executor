@@ -572,6 +572,212 @@ chmod +x INSTALL.sh && ./INSTALL.sh
 
 <br/>
 
+## 🐳 Docker Deployment
+
+Run AI Code Executor entirely in Docker - no local Python installation required!
+
+### Quick Docker Start
+
+```bash
+# Clone the repository
+git clone https://github.com/Ark0N/AI-Code-Executor.git
+cd AI-Code-Executor
+
+# Create .env file with your API keys
+cp .env.example .env
+# Edit .env and add your API keys (ANTHROPIC_API_KEY, OPENAI_API_KEY, etc.)
+
+# Start with Docker Compose
+docker compose up -d
+
+# View logs
+docker compose logs -f
+
+# Open http://localhost:8000
+```
+
+### Docker Files Overview
+
+| File | Purpose |
+|------|---------|
+| `Dockerfile` | Sandbox container image (where user code runs) |
+| `Dockerfile.app` | Main application container |
+| `docker-compose.yml` | Complete deployment configuration |
+| `.dockerignore` | Files excluded from build context |
+
+### How It Works
+
+The application uses **Docker-in-Docker** (via socket mounting):
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Host Machine                                               │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │  AI Code Executor Container                           │  │
+│  │  - FastAPI Backend                                    │  │
+│  │  - Web Frontend                                       │  │
+│  │  - Docker CLI (talks to host Docker)                  │  │
+│  └───────────────────────────────────────────────────────┘  │
+│              │                                              │
+│              │ /var/run/docker.sock                        │
+│              ▼                                              │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │  Docker Daemon                                        │  │
+│  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐     │  │
+│  │  │ Sandbox #1  │ │ Sandbox #2  │ │ Sandbox #N  │     │  │
+│  │  │ (Conv. 1)   │ │ (Conv. 2)   │ │ (Conv. N)   │     │  │
+│  │  └─────────────┘ └─────────────┘ └─────────────┘     │  │
+│  └───────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Environment Variables
+
+Create a `.env` file in the project root:
+
+```bash
+# Required - At least one AI provider
+ANTHROPIC_API_KEY=sk-ant-...
+OPENAI_API_KEY=sk-...
+GEMINI_API_KEY=AIza...
+
+# Optional - Server settings
+PORT=8000
+
+# Optional - Docker resource limits for code execution
+DOCKER_CPU_CORES=2
+DOCKER_MEMORY_LIMIT=8g
+DOCKER_STORAGE_LIMIT=10g
+DOCKER_EXECUTION_TIMEOUT=30
+
+# Optional - Ollama (if running on host)
+OLLAMA_HOST=http://host.docker.internal:11434
+
+# Optional - Remote Whisper server
+WHISPER_SERVER_URL=
+```
+
+### Docker Commands Reference
+
+```bash
+# Start in background
+docker compose up -d
+
+# Start with build (after code changes)
+docker compose up -d --build
+
+# View logs
+docker compose logs -f
+
+# View logs for specific service
+docker compose logs -f ai-code-executor
+
+# Stop containers
+docker compose down
+
+# Stop and remove volumes (deletes data!)
+docker compose down -v
+
+# Restart
+docker compose restart
+
+# Check status
+docker compose ps
+
+# Shell into running container
+docker exec -it ai-code-executor bash
+
+# Build sandbox image manually
+docker build -t ai-code-executor:latest .
+
+# Build app image manually  
+docker build -f Dockerfile.app -t ai-code-executor-app:latest .
+```
+
+### Connecting to Ollama (Local AI)
+
+If you're running Ollama on your host machine:
+
+**macOS / Windows (Docker Desktop):**
+```bash
+# Ollama is accessible at host.docker.internal automatically
+OLLAMA_HOST=http://host.docker.internal:11434
+```
+
+**Linux:**
+```bash
+# The docker-compose.yml includes extra_hosts for this
+OLLAMA_HOST=http://host.docker.internal:11434
+
+# Or use your machine's IP
+OLLAMA_HOST=http://192.168.1.100:11434
+```
+
+### Data Persistence
+
+Docker Compose creates named volumes for persistent data:
+
+| Volume | Purpose | Path in Container |
+|--------|---------|-------------------|
+| `ai-executor-data` | Database (conversations, settings) | `/app/data` |
+| `ai-executor-exports` | Exported Docker images | `/app/docker_images_exported` |
+
+To backup your data:
+```bash
+# Backup database
+docker run --rm -v ai-executor-data:/data -v $(pwd):/backup alpine \
+    tar cvf /backup/ai-executor-backup.tar /data
+
+# Restore database
+docker run --rm -v ai-executor-data:/data -v $(pwd):/backup alpine \
+    tar xvf /backup/ai-executor-backup.tar -C /
+```
+
+### Troubleshooting Docker
+
+**Permission denied on Docker socket:**
+```bash
+# On Linux, add your user to docker group
+sudo usermod -aG docker $USER
+newgrp docker
+
+# Or run with sudo
+sudo docker compose up -d
+```
+
+**Sandbox image not building:**
+```bash
+# Build manually
+docker build -t ai-code-executor:latest .
+
+# Check if image exists
+docker images | grep ai-code-executor
+```
+
+**Container can't reach Ollama:**
+```bash
+# Verify Ollama is running
+curl http://localhost:11434/api/tags
+
+# Test from inside container
+docker exec -it ai-code-executor curl http://host.docker.internal:11434/api/tags
+```
+
+**Port already in use:**
+```bash
+# Change port in .env
+PORT=8001
+
+# Or stop conflicting service
+sudo lsof -i :8000
+```
+
+<br/>
+
+---
+
+<br/>
+
 ## 📦 Installation
 
 ### Supported Platforms
@@ -660,9 +866,13 @@ AI-Code-Executor/
 ├── docs/                    # Documentation
 ├── scripts/                 # Utility scripts
 │
+├── Dockerfile               # Sandbox container (code execution)
+├── Dockerfile.app           # Application container
+├── docker-compose.yml       # Docker Compose deployment
+├── .dockerignore            # Docker build exclusions
 ├── INSTALL.sh               # Universal installer
 ├── start.sh                 # Start server
-├── Dockerfile               # Container image
+├── requirements.txt         # Python dependencies
 └── .env.example             # Configuration template
 ```
 
