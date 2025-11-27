@@ -120,6 +120,70 @@ body {
   overflow: hidden;
 }
 
+/* Global Progress Bar */
+.global-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: transparent;
+  z-index: 9999;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s, visibility 0.3s;
+}
+
+.global-progress.is-active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.global-progress__bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-accent), #0891b2, var(--color-accent));
+  background-size: 200% 100%;
+  width: 0%;
+  transition: width 0.3s ease-out;
+  animation: progress-shimmer 1.5s ease-in-out infinite;
+}
+
+.global-progress.is-indeterminate .global-progress__bar {
+  width: 100%;
+  animation: progress-indeterminate 1.5s ease-in-out infinite, progress-shimmer 1.5s ease-in-out infinite;
+}
+
+.global-progress__label {
+  position: absolute;
+  top: 8px;
+  right: 16px;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  background: var(--color-bg-secondary);
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border);
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: opacity 0.3s, transform 0.3s;
+}
+
+.global-progress.is-active .global-progress__label {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@keyframes progress-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes progress-indeterminate {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(0%); }
+  100% { transform: translateX(100%); }
+}
+
 /* Typography */
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-display);
@@ -924,6 +988,58 @@ pre code {
 }
 
 /* -------------------------
+   Docker Image Items
+   ------------------------- */
+.docker-images-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.docker-image-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-secondary);
+  transition: background-color var(--transition-fast);
+}
+
+.docker-image-item:hover {
+  background: var(--color-bg-hover);
+}
+
+.docker-image-item__icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.docker-image-item__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.docker-image-item__name {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text-primary);
+  word-break: break-all;
+}
+
+.docker-image-item__meta {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  margin-top: var(--space-1);
+}
+
+.docker-image-item__actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+/* -------------------------
    Stat Cards
    ------------------------- */
 .stats-grid {
@@ -1578,6 +1694,10 @@ pre code {
 
 .panel.is-open {
   transform: translateX(0);
+}
+
+.panel--wide {
+  width: 450px;
 }
 
 .panel__header {

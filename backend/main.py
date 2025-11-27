@@ -174,12 +174,23 @@ async def execute_code_blocks(
             # Use flush to persist but keep in same transaction
             await db.flush()
     
+    container_id_saved = False
     for language, code in code_blocks:
         if language.lower() in ["python", "py", "javascript", "js", "node", "bash", "sh", "shell"]:
             # Execute code with feedback
             output, exit_code, duration, files, peak_stats = await executor.execute_code(
                 conversation_id, language, code, feedback_callback=send_feedback
             )
+            
+            # Save container_id to conversation (only once)
+            if not container_id_saved and peak_stats and peak_stats.get('container_id'):
+                result = await db.execute(
+                    select(Conversation).where(Conversation.id == conversation_id)
+                )
+                conversation = result.scalar_one_or_none()
+                if conversation:
+                    conversation.container_id = peak_stats['container_id']
+                    container_id_saved = True
             
             # Save execution to database
             execution = CodeExecution(
@@ -1335,6 +1346,9 @@ async def get_settings(db: AsyncSession = Depends(get_session)):
     # Get docker timeout from env or default
     default_timeout = os.getenv("DOCKER_EXECUTION_TIMEOUT", "30")
     
+    # Get docker export path from env or default
+    default_export_path = os.getenv("DOCKER_EXPORT_PATH", "./docker_images_exported")
+    
     # Set defaults if not exists
     defaults = {
         "docker_cpus": "2",
@@ -1345,7 +1359,8 @@ async def get_settings(db: AsyncSession = Depends(get_session)):
         "view_mode": "auto",
         "system_prompt": default_system_prompt,
         "auto_fix_prompt": default_auto_fix_prompt,
-        "auto_fix_max_attempts": default_auto_fix_max_attempts
+        "auto_fix_max_attempts": default_auto_fix_max_attempts,
+        "docker_export_path": default_export_path
     }
     
     for key, value in defaults.items():
@@ -1387,7 +1402,7 @@ async def update_settings(settings: dict, db: AsyncSession = Depends(get_session
 
     
     # Validate settings
-    allowed_keys = ["docker_cpus", "docker_memory", "docker_storage", "docker_timeout", "anthropic_key", "openai_key", "gemini_key", "ollama_host", "whisper_server_url", "whisper_url", "voice_enabled", "view_mode", "system_prompt", "auto_fix_prompt", "auto_fix_max_attempts"]
+    allowed_keys = ["docker_cpus", "docker_memory", "docker_storage", "docker_timeout", "anthropic_key", "openai_key", "gemini_key", "ollama_host", "whisper_server_url", "whisper_url", "voice_enabled", "view_mode", "system_prompt", "auto_fix_prompt", "auto_fix_max_attempts", "docker_export_path"]
     for key in settings.keys():
         if key not in allowed_keys:
             raise HTTPException(status_code=400, detail=f"Invalid setting key: {key}")
@@ -1931,6 +1946,188 @@ async def upload_file_to_container(
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Failed to upload file: {str(e)}")
+
+
+# ============================================================================
+# Docker Image Export Endpoints
+# ============================================================================
+
+async def get_docker_export_path(db: AsyncSession) -> str:
+    """Get the docker export path from settings or env"""
+    result = await db.execute(select(Settings).where(Settings.key == "docker_export_path"))
+    setting = result.scalar_one_or_none()
+    if setting and setting.value:
+        return setting.value
+    return os.getenv("DOCKER_EXPORT_PATH", "./docker_images_exported")
+
+
+@app.post("/api/conversations/{conversation_id}/export-container")
+async def export_container(
+    conversation_id: int,
+    db: AsyncSession = Depends(get_session)
+):
+    """Export a conversation's Docker container as an image"""
+    import subprocess
+    from pathlib import Path
+    
+    # Get conversation
+    result = await db.execute(
+        select(Conversation).where(Conversation.id == conversation_id)
+    )
+    conversation = result.scalar_one_or_none()
+    
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    
+    # Get container ID
+    container_id = conversation.container_id
+    if not container_id:
+        raise HTTPException(status_code=400, detail="No container exists for this conversation. Run some code first.")
+    
+    # Check container exists
+    try:
+        docker_client = docker.from_env()
+        container = docker_client.containers.get(container_id)
+    except docker.errors.NotFound:
+        raise HTTPException(status_code=400, detail="Container no longer exists. Run some code to create a new one.")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Docker error: {str(e)}")
+    
+    # Get export path from settings
+    export_path = await get_docker_export_path(db)
+    export_dir = Path(export_path)
+    export_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Generate image name
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    if conversation.title and conversation.title != "New Conversation":
+        # Sanitize title for filename
+        safe_title = re.sub(r'[^\w\s-]', '', conversation.title).strip()
+        safe_title = re.sub(r'[-\s]+', '-', safe_title)[:50]
+        image_name = f"{safe_title}_{timestamp}"
+    else:
+        image_name = f"conversation-{conversation_id}_{timestamp}"
+    
+    tar_filename = f"{image_name}.tar"
+    tar_path = export_dir / tar_filename
+    
+    try:
+        # Step 1: Commit container to image
+        print(f"Committing container {container_id} to image {image_name}...")
+        image = container.commit(repository=image_name, tag="latest")
+        print(f"Created image: {image.id}")
+        
+        # Step 2: Save image to tar file
+        print(f"Saving image to {tar_path}...")
+        with open(tar_path, 'wb') as f:
+            for chunk in image.save(named=True):
+                f.write(chunk)
+        
+        # Get file size
+        file_size = tar_path.stat().st_size
+        
+        print(f"Successfully exported to {tar_path} ({file_size} bytes)")
+        
+        return {
+            "success": True,
+            "message": f"Container exported successfully",
+            "filename": tar_filename,
+            "path": str(tar_path),
+            "size": file_size,
+            "image_name": f"{image_name}:latest"
+        }
+        
+    except Exception as e:
+        print(f"Error exporting container: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to export container: {str(e)}")
+
+
+@app.get("/api/docker-images")
+async def list_docker_images(db: AsyncSession = Depends(get_session)):
+    """List all exported Docker images"""
+    from pathlib import Path
+    
+    export_path = await get_docker_export_path(db)
+    export_dir = Path(export_path)
+    
+    if not export_dir.exists():
+        return {"images": [], "export_path": str(export_dir)}
+    
+    images = []
+    for tar_file in export_dir.glob("*.tar"):
+        stat = tar_file.stat()
+        images.append({
+            "filename": tar_file.name,
+            "size": stat.st_size,
+            "created": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+            "path": str(tar_file)
+        })
+    
+    # Sort by creation date, newest first
+    images.sort(key=lambda x: x["created"], reverse=True)
+    
+    return {"images": images, "export_path": str(export_dir)}
+
+
+@app.get("/api/docker-images/{filename}/download")
+async def download_docker_image(
+    filename: str,
+    db: AsyncSession = Depends(get_session)
+):
+    """Download an exported Docker image"""
+    from pathlib import Path
+    
+    # Validate filename (prevent path traversal)
+    if "/" in filename or "\\" in filename or ".." in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    
+    export_path = await get_docker_export_path(db)
+    tar_path = Path(export_path) / filename
+    
+    if not tar_path.exists():
+        raise HTTPException(status_code=404, detail="Image file not found")
+    
+    def iter_file():
+        with open(tar_path, 'rb') as f:
+            while chunk := f.read(8192):
+                yield chunk
+    
+    return StreamingResponse(
+        iter_file(),
+        media_type="application/x-tar",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Length": str(tar_path.stat().st_size)
+        }
+    )
+
+
+@app.delete("/api/docker-images/{filename}")
+async def delete_docker_image(
+    filename: str,
+    db: AsyncSession = Depends(get_session)
+):
+    """Delete an exported Docker image"""
+    from pathlib import Path
+    
+    # Validate filename (prevent path traversal)
+    if "/" in filename or "\\" in filename or ".." in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    
+    export_path = await get_docker_export_path(db)
+    tar_path = Path(export_path) / filename
+    
+    if not tar_path.exists():
+        raise HTTPException(status_code=404, detail="Image file not found")
+    
+    try:
+        tar_path.unlink()
+        return {"success": True, "message": f"Deleted {filename}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete: {str(e)}")
+
 
 app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
 

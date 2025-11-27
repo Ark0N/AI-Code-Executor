@@ -49,6 +49,12 @@
   <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
 </head>
 <body>
+  <!-- Global Progress Bar -->
+  <div class="global-progress" id="globalProgress">
+    <div class="global-progress__bar" id="globalProgressBar"></div>
+    <div class="global-progress__label" id="globalProgressLabel"></div>
+  </div>
+
   <!-- Mobile Sidebar Overlay -->
   <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
@@ -116,6 +122,9 @@
           <!-- Action Buttons (desktop) -->
           <button class="btn btn--ghost hide-mobile" id="filesBtn" aria-label="Files">
             <span>📁</span><span class="btn__label">Files</span>
+          </button>
+          <button class="btn btn--ghost hide-mobile" id="dockerImagesBtn" aria-label="Docker Images">
+            <span>🐳</span><span class="btn__label">Images</span>
           </button>
           <button class="btn btn--ghost hide-mobile" id="terminalBtn" aria-label="Terminal">
             <span>🖥️</span><span class="btn__label">Terminal</span>
@@ -244,6 +253,43 @@
     </aside>
   </div>
 
+  <!-- Docker Images Panel -->
+  <aside class="panel panel--wide" id="dockerImagesPanel">
+    <header class="panel__header">
+      <h2 class="panel__title">🐳 Docker Images</h2>
+      <div class="flex gap-2">
+        <button class="btn-icon btn-icon--sm" id="refreshDockerImagesBtn" data-tooltip="Refresh">🔄</button>
+        <button class="btn-icon btn-icon--sm" id="closeDockerImagesBtn">✕</button>
+      </div>
+    </header>
+    <div class="panel__content">
+      <div class="docker-images-list" id="dockerImagesList">
+        <div class="empty-state">
+          <div class="empty-state__icon">🐳</div>
+          <div class="empty-state__title">No exported images</div>
+          <div class="empty-state__text">Export a container from the conversation menu</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Export Container Confirmation Modal -->
+  <div class="modal-backdrop" id="exportContainerBackdrop"></div>
+  <div class="modal modal--sm" id="exportContainerModal">
+    <header class="modal__header">
+      <h2 class="modal__title">🐳 Export Container</h2>
+      <button class="btn-icon btn-icon--sm" id="closeExportContainerBtn">✕</button>
+    </header>
+    <div class="modal__body">
+      <p id="exportContainerMessage">Export container for this conversation?</p>
+      <p class="text-muted text-sm">This will create a Docker image that can be imported on another machine.</p>
+    </div>
+    <footer class="modal__footer">
+      <button class="btn btn--ghost" id="cancelExportContainerBtn">Cancel</button>
+      <button class="btn btn--primary" id="confirmExportContainerBtn">🐳 Export</button>
+    </footer>
+  </div>
+
   <!-- Settings Modal -->
   <div class="modal-backdrop" id="settingsBackdrop"></div>
   <div class="modal modal--lg" id="settingsModal">
@@ -366,6 +412,12 @@
             <option value="20g">20 GB</option>
             <option value="50g">50 GB</option>
           </select>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">🐳 Image Export Path</label>
+          <input type="text" class="input" id="dockerExportPath" placeholder="./docker_images_exported" value="./docker_images_exported">
+          <span class="form-help">Where exported container images are saved</span>
         </div>
         
         <div class="form-group">

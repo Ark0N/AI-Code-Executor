@@ -864,6 +864,30 @@ const API = {
   },
   
   // -------------------------
+  // Docker Images Export
+  // -------------------------
+  
+  async exportContainer(conversationId) {
+    return this.request(`/api/conversations/${conversationId}/export-container`, {
+      method: 'POST'
+    });
+  },
+  
+  async listDockerImages() {
+    return this.request('/api/docker-images');
+  },
+  
+  async deleteDockerImage(filename) {
+    return this.request(`/api/docker-images/${encodeURIComponent(filename)}`, {
+      method: 'DELETE'
+    });
+  },
+  
+  getDockerImageDownloadUrl(filename) {
+    return `/api/docker-images/${encodeURIComponent(filename)}/download`;
+  },
+
+  // -------------------------
   // Stats (SSE)
   // -------------------------
   
@@ -972,6 +996,15 @@ const Sidebar = {
       const id = parseInt(btn.closest('.conv-item').dataset.id);
       if (id) this.renameConversation(id);
     });
+    
+    // Export container button
+    utils.delegate(convList, '.conv-item__export', 'click', (e, btn) => {
+      e.stopPropagation();
+      const item = btn.closest('.conv-item');
+      const id = parseInt(item.dataset.id);
+      const title = item.querySelector('.conv-item__title')?.textContent || '';
+      if (id) DockerImages.showExportConfirmation(id, title);
+    });
   },
   
   /**
@@ -1022,6 +1055,7 @@ const Sidebar = {
           </div>
         </div>
         <div class="conv-item__actions">
+          <button class="btn-icon btn-icon--sm btn--ghost conv-item__export" title="Export Container">🐳</button>
           <button class="btn-icon btn-icon--sm btn--ghost conv-item__rename" title="Rename">✏️</button>
         </div>
       </div>
@@ -3109,6 +3143,257 @@ const Files = {
 
 // Export
 window.Files = Files;
+
+/* ============================================
+   AI Code Executor - Docker Images Component
+   ============================================ */
+
+const DockerImages = {
+  elements: {},
+  isOpen: false,
+  exportConversationId: null,
+  
+  /**
+   * Initialize Docker Images panel
+   */
+  init() {
+    this.cacheElements();
+    this.bindEvents();
+  },
+  
+  /**
+   * Cache DOM elements
+   */
+  cacheElements() {
+    this.elements = {
+      btn: $('#dockerImagesBtn'),
+      panel: $('#dockerImagesPanel'),
+      closeBtn: $('#closeDockerImagesBtn'),
+      refreshBtn: $('#refreshDockerImagesBtn'),
+      list: $('#dockerImagesList'),
+      // Export confirmation modal
+      exportBackdrop: $('#exportContainerBackdrop'),
+      exportModal: $('#exportContainerModal'),
+      exportMessage: $('#exportContainerMessage'),
+      closeExportBtn: $('#closeExportContainerBtn'),
+      cancelExportBtn: $('#cancelExportContainerBtn'),
+      confirmExportBtn: $('#confirmExportContainerBtn')
+    };
+  },
+  
+  /**
+   * Bind event listeners
+   */
+  bindEvents() {
+    const { btn, closeBtn, refreshBtn, exportBackdrop, closeExportBtn, cancelExportBtn, confirmExportBtn } = this.elements;
+    
+    // Toggle panel
+    btn?.addEventListener('click', () => this.toggle());
+    closeBtn?.addEventListener('click', () => this.hide());
+    refreshBtn?.addEventListener('click', () => this.loadImages());
+    
+    // Export confirmation modal events
+    exportBackdrop?.addEventListener('click', () => this.hideExportConfirmation());
+    closeExportBtn?.addEventListener('click', () => this.hideExportConfirmation());
+    cancelExportBtn?.addEventListener('click', () => this.hideExportConfirmation());
+    confirmExportBtn?.addEventListener('click', () => this.confirmExport());
+    
+    // Delegate events for download/delete buttons
+    this.elements.list?.addEventListener('click', async (e) => {
+      const downloadBtn = e.target.closest('.docker-image__download');
+      const deleteBtn = e.target.closest('.docker-image__delete');
+      
+      if (downloadBtn) {
+        const filename = downloadBtn.dataset.filename;
+        this.downloadImage(filename);
+      }
+      
+      if (deleteBtn) {
+        const filename = deleteBtn.dataset.filename;
+        if (confirm(`Delete ${filename}?`)) {
+          await this.deleteImage(filename);
+        }
+      }
+    });
+  },
+  
+  /**
+   * Toggle panel visibility
+   */
+  toggle() {
+    if (this.isOpen) {
+      this.hide();
+    } else {
+      this.show();
+    }
+  },
+  
+  /**
+   * Show panel
+   */
+  show() {
+    const { panel, btn } = this.elements;
+    
+    panel?.classList.add('is-open');
+    btn?.classList.add('is-active');
+    this.isOpen = true;
+    
+    this.loadImages();
+  },
+  
+  /**
+   * Hide panel
+   */
+  hide() {
+    const { panel, btn } = this.elements;
+    
+    panel?.classList.remove('is-open');
+    btn?.classList.remove('is-active');
+    this.isOpen = false;
+  },
+  
+  /**
+   * Load exported Docker images
+   */
+  async loadImages() {
+    const { list } = this.elements;
+    if (!list) return;
+    
+    try {
+      const data = await API.listDockerImages();
+      const images = data.images || [];
+      
+      if (images.length === 0) {
+        list.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state__icon">🐳</div>
+            <div class="empty-state__title">No exported images</div>
+            <div class="empty-state__text">Export a container from the conversation menu</div>
+          </div>
+        `;
+        return;
+      }
+      
+      list.innerHTML = images.map(img => `
+        <div class="docker-image-item">
+          <div class="docker-image-item__icon">🐳</div>
+          <div class="docker-image-item__info">
+            <div class="docker-image-item__name">${utils.escapeHtml(img.filename)}</div>
+            <div class="docker-image-item__meta">
+              ${utils.formatBytes(img.size)} • ${utils.formatTimeAgo(img.created)}
+            </div>
+          </div>
+          <div class="docker-image-item__actions">
+            <button class="btn-icon btn-icon--sm docker-image__download" data-filename="${utils.escapeHtml(img.filename)}" title="Download">⬇️</button>
+            <button class="btn-icon btn-icon--sm docker-image__delete" data-filename="${utils.escapeHtml(img.filename)}" title="Delete">🗑️</button>
+          </div>
+        </div>
+      `).join('');
+      
+    } catch (error) {
+      console.error('Failed to load Docker images:', error);
+      list.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state__icon">❌</div>
+          <div class="empty-state__title">Failed to load images</div>
+          <div class="empty-state__text">${utils.escapeHtml(error.message)}</div>
+        </div>
+      `;
+    }
+  },
+  
+  /**
+   * Show export confirmation modal
+   */
+  showExportConfirmation(conversationId, title) {
+    const { exportBackdrop, exportModal, exportMessage } = this.elements;
+    
+    this.exportConversationId = conversationId;
+    
+    const displayTitle = title && title !== 'New Conversation' ? title : `Conversation #${conversationId}`;
+    exportMessage.textContent = `Export container for "${displayTitle}"?`;
+    
+    exportBackdrop?.classList.add('is-open');
+    exportModal?.classList.add('is-open');
+  },
+  
+  /**
+   * Hide export confirmation modal
+   */
+  hideExportConfirmation() {
+    const { exportBackdrop, exportModal } = this.elements;
+    
+    exportBackdrop?.classList.remove('is-open');
+    exportModal?.classList.remove('is-open');
+    this.exportConversationId = null;
+  },
+  
+  /**
+   * Confirm and perform export
+   */
+  async confirmExport() {
+    if (!this.exportConversationId) return;
+    
+    const conversationId = this.exportConversationId;
+    this.hideExportConfirmation();
+    
+    // Show progress bar with estimated time (docker export can take 30-60s for large images)
+    GlobalProgress.showWithEstimate('🐳 Exporting container...', 30);
+    
+    try {
+      const result = await API.exportContainer(conversationId);
+      
+      if (result.success) {
+        GlobalProgress.complete(`✓ Exported ${result.filename}`);
+        Toast.success(`Exported to ${result.filename}`);
+        
+        // Refresh the list if panel is open
+        if (this.isOpen) {
+          this.loadImages();
+        }
+      } else {
+        GlobalProgress.hide();
+        Toast.error(result.message || 'Export failed');
+      }
+      
+    } catch (error) {
+      console.error('Export failed:', error);
+      GlobalProgress.hide();
+      Toast.error(`Export failed: ${error.message}`);
+    }
+  },
+  
+  /**
+   * Download an exported image
+   */
+  downloadImage(filename) {
+    const url = API.getDockerImageDownloadUrl(filename);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  },
+  
+  /**
+   * Delete an exported image
+   */
+  async deleteImage(filename) {
+    try {
+      await API.deleteDockerImage(filename);
+      Toast.success(`Deleted ${filename}`);
+      this.loadImages();
+    } catch (error) {
+      console.error('Delete failed:', error);
+      Toast.error(`Delete failed: ${error.message}`);
+    }
+  }
+};
+
+// Export
+window.DockerImages = DockerImages;
+
 /* ============================================
    AI Code Executor - Stats Component
    ============================================ */
@@ -3617,6 +3902,7 @@ const Settings = {
       dockerCpus: $('#dockerCpus'),
       dockerMemory: $('#dockerMemory'),
       dockerStorage: $('#dockerStorage'),
+      dockerExportPath: $('#dockerExportPath'),
       dockerTimeout: $('#dockerTimeout'),
       containerList: $('#containerList'),
       cleanupContainersBtn: $('#cleanupContainersBtn')
@@ -3685,7 +3971,7 @@ const Settings = {
   populateForm(settings) {
     const { anthropicKey, openaiKey, geminiKey, ollamaHost,
             voiceEnabled, whisperUrl, viewMode, executionTimeout, autoFixMaxAttempts, systemPrompt, autoFixPrompt,
-            dockerCpus, dockerMemory, dockerStorage, dockerTimeout } = this.elements;
+            dockerCpus, dockerMemory, dockerStorage, dockerExportPath, dockerTimeout } = this.elements;
     
     // API Keys (masked)
     if (anthropicKey) anthropicKey.value = settings.anthropic_key || '';
@@ -3708,6 +3994,7 @@ const Settings = {
     if (dockerCpus) dockerCpus.value = settings.docker_cpus || '2';
     if (dockerMemory) dockerMemory.value = settings.docker_memory || '8g';
     if (dockerStorage) dockerStorage.value = settings.docker_storage || '10g';
+    if (dockerExportPath) dockerExportPath.value = settings.docker_export_path || './docker_images_exported';
     if (dockerTimeout) dockerTimeout.value = settings.docker_timeout || '30';
     
     // Apply view mode
@@ -3746,7 +4033,7 @@ Provide the corrected code in a code block.`;
   async save() {
     const { anthropicKey, openaiKey, geminiKey, ollamaHost,
             voiceEnabled, whisperUrl, viewMode, executionTimeout, autoFixMaxAttempts, systemPrompt, autoFixPrompt,
-            dockerCpus, dockerMemory, dockerStorage, dockerTimeout } = this.elements;
+            dockerCpus, dockerMemory, dockerStorage, dockerExportPath, dockerTimeout } = this.elements;
     
     // Use executionTimeout for docker_timeout (they're the same setting now)
     const timeoutValue = executionTimeout?.value || dockerTimeout?.value || '30';
@@ -3765,6 +4052,7 @@ Provide the corrected code in a code block.`;
       docker_cpus: dockerCpus?.value || '2',
       docker_memory: dockerMemory?.value || '8g',
       docker_storage: dockerStorage?.value || '10g',
+      docker_export_path: dockerExportPath?.value || './docker_images_exported',
       docker_timeout: timeoutValue
     };
     
@@ -4420,6 +4708,118 @@ window.Terminal = TerminalManager;
 /**
  * Toast notification system
  */
+/* ============================================
+   Global Progress Bar
+   ============================================ */
+
+const GlobalProgress = {
+  elements: {},
+  
+  init() {
+    this.elements = {
+      container: $('#globalProgress'),
+      bar: $('#globalProgressBar'),
+      label: $('#globalProgressLabel')
+    };
+  },
+  
+  /**
+   * Show progress bar with label
+   * @param {string} label - Text to display
+   * @param {boolean} indeterminate - If true, shows animated indeterminate state
+   */
+  show(label = '', indeterminate = false) {
+    if (!this.elements.container) this.init();
+    
+    const { container, bar, label: labelEl } = this.elements;
+    
+    container?.classList.add('is-active');
+    if (indeterminate) {
+      container?.classList.add('is-indeterminate');
+    } else {
+      container?.classList.remove('is-indeterminate');
+    }
+    
+    if (labelEl) labelEl.textContent = label;
+    if (bar && !indeterminate) bar.style.width = '0%';
+  },
+  
+  /**
+   * Update progress
+   * @param {number} percent - Progress percentage (0-100)
+   * @param {string} label - Optional label update
+   */
+  update(percent, label = null) {
+    if (!this.elements.bar) this.init();
+    
+    const { container, bar, label: labelEl } = this.elements;
+    
+    container?.classList.remove('is-indeterminate');
+    if (bar) bar.style.width = `${Math.min(100, Math.max(0, percent))}%`;
+    if (label !== null && labelEl) labelEl.textContent = label;
+  },
+  
+  /**
+   * Hide progress bar
+   */
+  hide() {
+    if (!this.elements.container) this.init();
+    
+    const { container, bar } = this.elements;
+    
+    container?.classList.remove('is-active', 'is-indeterminate');
+    if (bar) bar.style.width = '0%';
+  },
+  
+  /**
+   * Show progress with auto-hide on completion
+   * @param {string} label - Label text
+   * @param {number} estimatedSeconds - Estimated duration for fake progress
+   */
+  async showWithEstimate(label, estimatedSeconds = 10) {
+    this.show(label, false);
+    
+    const startTime = Date.now();
+    const interval = 100; // Update every 100ms
+    
+    return new Promise((resolve) => {
+      const timer = setInterval(() => {
+        const elapsed = (Date.now() - startTime) / 1000;
+        // Ease out - starts fast, slows down as it approaches 90%
+        const progress = Math.min(90, (1 - Math.exp(-elapsed / (estimatedSeconds / 3))) * 90);
+        this.update(progress);
+      }, interval);
+      
+      // Store timer so it can be completed externally
+      this._currentTimer = timer;
+      this._resolveProgress = resolve;
+    });
+  },
+  
+  /**
+   * Complete the progress (jump to 100% and hide)
+   */
+  complete(label = null) {
+    if (this._currentTimer) {
+      clearInterval(this._currentTimer);
+      this._currentTimer = null;
+    }
+    
+    this.update(100, label);
+    
+    setTimeout(() => {
+      this.hide();
+      if (this._resolveProgress) {
+        this._resolveProgress();
+        this._resolveProgress = null;
+      }
+    }, 500);
+  }
+};
+
+// Export
+window.GlobalProgress = GlobalProgress;
+
 const Toast = {
   container: null,
   
@@ -4501,6 +4901,7 @@ const App = {
     
     // Initialize Toast first
     Toast.init();
+    GlobalProgress.init();
     
     // Initialize all components
     try {
@@ -4509,6 +4910,7 @@ const App = {
       Settings.init();
       Files.init();
       Stats.init();
+      DockerImages.init();
       Terminal.init();
       Voice.init();
       

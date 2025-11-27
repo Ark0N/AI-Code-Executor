@@ -104,16 +104,22 @@ class CodeExecutor:
         
         if language.lower() in ["python", "py"]:
             filename = f"script_{timestamp}.py"
-            command = ["python", filename]
+            base_command = ["python", filename]
         elif language.lower() in ["javascript", "js", "node"]:
             filename = f"script_{timestamp}.js"
-            command = ["node", filename]
+            base_command = ["node", filename]
         elif language.lower() in ["bash", "sh", "shell"]:
             filename = f"script_{timestamp}.sh"
-            command = ["bash", filename]
+            base_command = ["bash", filename]
         else:
             await send_feedback(f"❌ Unsupported language: {language}", "error")
             return f"Unsupported language: {language}", 1, 0.0, [], None
+        
+        # Wrap command with timeout if set (timeout command returns 124 on timeout)
+        if self.timeout > 0:
+            command = ["timeout", "--signal=KILL", str(self.timeout)] + base_command
+        else:
+            command = base_command
         
         await send_feedback(f"📝 Writing {language} code to container...", "info")
         
@@ -168,12 +174,14 @@ class CodeExecutor:
             # Start monitoring task
             monitor_task = asyncio.create_task(monitor_stats())
             
-            # Run in a thread to allow timeout
+            # Run in a thread (timeout is handled by the timeout command in container)
             loop = asyncio.get_event_loop()
             
+            # Add a generous Python-side timeout as backup (2x container timeout + 30s buffer)
+            python_timeout = (self.timeout * 2 + 30) if self.timeout > 0 else None
+            
             try:
-                # Use wait_for with timeout (0 = unlimited)
-                if self.timeout > 0:
+                if python_timeout:
                     exec_result = await asyncio.wait_for(
                         loop.run_in_executor(
                             None,
@@ -183,10 +191,9 @@ class CodeExecutor:
                                 demux=True
                             )
                         ),
-                        timeout=self.timeout
+                        timeout=python_timeout
                     )
                 else:
-                    # No timeout
                     exec_result = await loop.run_in_executor(
                         None,
                         lambda: container.exec_run(
@@ -199,13 +206,14 @@ class CodeExecutor:
                 duration = time.time() - exec_start_time
                 
             except asyncio.TimeoutError:
+                # This should rarely happen - backup timeout
                 duration = time.time() - exec_start_time
                 
                 # Kill the running process in the container
                 try:
-                    # Kill all python/bash processes in container
                     container.exec_run("pkill -9 -f python", demux=True)
                     container.exec_run("pkill -9 -f bash", demux=True)
+                    container.exec_run("pkill -9 -f node", demux=True)
                 except:
                     pass
                 
@@ -216,8 +224,8 @@ class CodeExecutor:
                 except asyncio.CancelledError:
                     pass
                 
-                await send_feedback(f"⏱️ Execution timeout ({self.timeout}s exceeded) - process killed. You can change the timeout in Settings → Features.", "error")
-                return f"Execution timeout ({self.timeout}s exceeded) - You can adjust timeout in Settings → Features", 124, duration, [], {'peak_cpu': peak_cpu, 'peak_memory': peak_memory}
+                await send_feedback(f"⏱️ Execution timeout - process killed. You can change the timeout in Settings → Features.", "error")
+                return f"Execution timeout - process killed. You can change the timeout in Settings → Features.", 124, duration, [], {'peak_cpu': peak_cpu, 'peak_memory': peak_memory, 'container_id': container.id}
             
             # Stop monitoring
             monitor_task.cancel()
@@ -229,6 +237,17 @@ class CodeExecutor:
             # Get output
             stdout, stderr = exec_result.output
             exit_code = exec_result.exit_code
+            
+            # Check if killed by timeout command (exit code 137 = 128 + SIGKILL)
+            if exit_code == 137 or exit_code == 124:
+                await send_feedback(f"⏱️ Execution timeout ({self.timeout}s exceeded) - process killed. You can change the timeout in Settings → Features.", "error")
+                output_parts = []
+                if stdout:
+                    output_parts.append(stdout.decode('utf-8', errors='replace'))
+                if stderr:
+                    output_parts.append(stderr.decode('utf-8', errors='replace'))
+                output = "\n".join(output_parts).strip()
+                return f"{output}\n\nExecution timeout ({self.timeout}s exceeded). You can change the timeout in Settings → Features.", 124, duration, [], {'peak_cpu': peak_cpu, 'peak_memory': peak_memory, 'container_id': container.id}
             
             if exit_code == 0:
                 await send_feedback(f"✓ Code executed successfully in {duration:.2f}s", "success")
@@ -276,7 +295,8 @@ class CodeExecutor:
             
             peak_stats = {
                 'peak_cpu': peak_cpu,
-                'peak_memory': peak_memory
+                'peak_memory': peak_memory,
+                'container_id': container.id
             }
             
             return output, exit_code, duration, files_list, peak_stats
