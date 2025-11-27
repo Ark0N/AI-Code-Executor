@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
+  <meta name="theme-color" content="#0a0a0b">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>AI Code Executor</title>
+  
+  <!-- Favicons -->
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="apple-touch-icon-precomposed" href="/apple-touch-icon-precomposed.png">
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Styles -->
+  <link rel="stylesheet" href="/style.css">
+  
+  <!-- iOS Safari Viewport Fix - must run before render -->
+  <script>
+    (function() {
+      var setHeight = function() {
+        var vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+        document.documentElement.style.setProperty('--app-height', vh + 'px');
+      };
+      setHeight();
+      window.addEventListener('resize', setHeight);
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', setHeight);
+      }
+    })();
+  </script>
+  
+  <!-- Highlight.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  
+  <!-- Marked.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/11.1.1/marked.min.js"></script>
+  
+  <!-- xterm.js -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
+  <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+</head>
+<body>
+  <!-- Mobile Sidebar Overlay -->
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <div class="app" id="app">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <header class="sidebar__header">
+        <div class="sidebar__logo">
+          <span class="sidebar__logo-icon">⚡</span>
+          <span>AI Code Executor</span>
+        </div>
+        <button class="btn-icon btn-icon--sm btn--ghost hide-desktop" id="closeSidebarBtn" aria-label="Close menu">
+          ✕
+        </button>
+      </header>
+      
+      <div class="sidebar__actions">
+        <button class="btn btn--primary" id="newChatBtn">
+          <span>+</span>
+          <span>New Chat</span>
+        </button>
+        <button class="btn btn--danger" id="deleteChatBtn" style="display: none;">
+          <span>🗑️</span>
+          <span>Delete</span>
+        </button>
+      </div>
+      
+      <div class="sidebar__content">
+        <div class="conv-list" id="convList">
+          <!-- Conversations loaded dynamically -->
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main">
+      <!-- Header -->
+      <header class="header">
+        <div class="header__left">
+          <button class="btn-icon header__menu-btn" id="menuBtn" aria-label="Open menu">
+            ☰
+          </button>
+          
+          <div class="model-select">
+            <select class="select" id="providerSelect" aria-label="Select provider">
+              <option value="anthropic">🤖 Claude</option>
+              <option value="openai">🧠 GPT</option>
+              <option value="gemini">✨ Gemini</option>
+              <option value="ollama">🏠 Ollama</option>
+            </select>
+            
+            <select class="select" id="modelSelect" aria-label="Select model">
+            <!-- Populated by JavaScript -->
+          </select>
+          </div>
+        </div>
+        
+        <div class="header__right">
+          <!-- Whisper Status -->
+          <div class="badge" id="whisperStatus" style="display: none;">
+            <span class="status-dot status-dot--success"></span>
+            <span>GPU</span>
+          </div>
+          
+          <!-- Action Buttons (desktop) -->
+          <button class="btn btn--ghost hide-mobile" id="filesBtn" aria-label="Files">
+            <span>📁</span><span class="btn__label">Files</span>
+          </button>
+          <button class="btn btn--ghost hide-mobile" id="terminalBtn" aria-label="Terminal">
+            <span>🖥️</span><span class="btn__label">Terminal</span>
+          </button>
+          <button class="btn btn--ghost hide-mobile" id="statsBtn" aria-label="Stats">
+            <span>📊</span><span class="btn__label">Stats</span>
+          </button>
+          
+          <!-- Auto-Fix Toggle -->
+          <label class="toggle" id="autoFixToggle">
+            <input type="checkbox" class="toggle__input" id="autoFixInput">
+            <span class="toggle__slider"></span>
+            <span class="toggle__label">🔧 Auto-Fix</span>
+          </label>
+          
+          <!-- Settings Button -->
+          <button class="btn btn--ghost" id="settingsBtn" aria-label="Settings">
+            <span>⚙️</span><span class="btn__label">Settings</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Chat Area -->
+      <div class="chat">
+        <div class="chat__messages" id="messagesContainer">
+          <!-- Welcome Message -->
+          <div class="welcome" id="welcomeMessage">
+            <h1 class="welcome__title">AI Code Executor</h1>
+            <p class="welcome__subtitle">Execute code with AI assistance in Docker containers</p>
+            
+            <div class="welcome__features">
+              <div class="welcome__feature">
+                <span class="welcome__feature-icon">🐍</span>
+                <div>
+                  <div class="welcome__feature-title">Multi-Language</div>
+                  <div class="welcome__feature-text">Python, JavaScript, Bash</div>
+                </div>
+              </div>
+              <div class="welcome__feature">
+                <span class="welcome__feature-icon">🐳</span>
+                <div>
+                  <div class="welcome__feature-title">Isolated</div>
+                  <div class="welcome__feature-text">Docker containers per chat</div>
+                </div>
+              </div>
+              <div class="welcome__feature">
+                <span class="welcome__feature-icon">⚡</span>
+                <div>
+                  <div class="welcome__feature-title">Powerful</div>
+                  <div class="welcome__feature-text">2 CPU cores, 8GB RAM</div>
+                </div>
+              </div>
+              <div class="welcome__feature">
+                <span class="welcome__feature-icon">🌐</span>
+                <div>
+                  <div class="welcome__feature-title">Connected</div>
+                  <div class="welcome__feature-text">Internet access enabled</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Input Area -->
+        <div class="input-area">
+          <div class="input-area__field">
+            <textarea 
+              class="input-area__textarea" 
+              id="messageInput" 
+              placeholder="Write your message or use voice input..."
+              rows="1"
+            ></textarea>
+          </div>
+          <div class="input-area__actions">
+            <button class="btn-icon input-area__btn" id="micBtn" data-tooltip="Voice input">
+              🎤
+            </button>
+            <button class="btn-icon btn--primary input-area__btn" id="sendBtn" data-tooltip="Send">
+              ➤
+            </button>
+            <button class="btn-icon btn--danger input-area__btn" id="stopBtn" style="display: none;" data-tooltip="Stop">
+              ⏹
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Files Panel -->
+    <aside class="panel" id="filesPanel">
+      <header class="panel__header">
+        <h2 class="panel__title">📁 Files</h2>
+        <div class="flex gap-2">
+          <button class="btn-icon btn-icon--sm" id="uploadFileBtn" data-tooltip="Upload">📤</button>
+          <button class="btn-icon btn-icon--sm" id="refreshFilesBtn" data-tooltip="Refresh">🔄</button>
+          <button class="btn-icon btn-icon--sm" id="closeFilesBtn">✕</button>
+        </div>
+      </header>
+      <div class="panel__content">
+        <div class="file-list" id="fileList">
+          <div class="empty-state">
+            <div class="empty-state__icon">📂</div>
+            <div class="empty-state__title">No files yet</div>
+            <div class="empty-state__text">Files created by code will appear here</div>
+          </div>
+        </div>
+      </div>
+      <input type="file" id="fileUploadInput" multiple style="display: none;">
+    </aside>
+
+    <!-- Stats Panel -->
+    <aside class="panel" id="statsPanel">
+      <header class="panel__header">
+        <h2 class="panel__title">📊 Container Stats</h2>
+        <button class="btn-icon btn-icon--sm" id="closeStatsBtn">✕</button>
+      </header>
+      <div class="panel__content">
+        <div class="stats-grid" id="statsGrid">
+          <div class="empty-state">
+            <div class="empty-state__icon">📊</div>
+            <div class="empty-state__title">No active container</div>
+            <div class="empty-state__text">Stats will appear when you run code</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="modal-backdrop" id="settingsBackdrop"></div>
+  <div class="modal modal--lg" id="settingsModal">
+    <header class="modal__header">
+      <h2 class="modal__title">⚙️ Settings</h2>
+      <button class="btn-icon btn-icon--sm" id="closeSettingsBtn">✕</button>
+    </header>
+    
+    <div class="tabs" id="settingsTabs">
+      <button class="tab is-active" data-tab="api">🔑 API Keys</button>
+      <button class="tab" data-tab="features">🎛️ Features</button>
+      <button class="tab" data-tab="prompts">📝 Prompts</button>
+      <button class="tab" data-tab="docker">🐳 Docker</button>
+    </div>
+    
+    <div class="modal__body">
+      <!-- API Keys Tab -->
+      <div class="tab-panel is-active" id="apiTab">
+        <div class="form-group">
+          <label class="form-label">Anthropic API Key</label>
+          <div class="input-group">
+            <input type="password" class="input" id="anthropicKey" placeholder="sk-ant-...">
+            <button class="btn-icon" id="toggleAnthropicKey">👁️</button>
+          </div>
+          <a href="https://console.anthropic.com/settings/keys" target="_blank" class="form-help">Get your key →</a>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">OpenAI API Key</label>
+          <div class="input-group">
+            <input type="password" class="input" id="openaiKey" placeholder="sk-...">
+            <button class="btn-icon" id="toggleOpenaiKey">👁️</button>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">Google Gemini API Key</label>
+          <div class="input-group">
+            <input type="password" class="input" id="geminiKey" placeholder="AIza...">
+            <button class="btn-icon" id="toggleGeminiKey">👁️</button>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">Ollama Host URL</label>
+          <input type="text" class="input" id="ollamaHost" placeholder="http://localhost:11434">
+        </div>
+      </div>
+      
+      <!-- Features Tab -->
+      <div class="tab-panel" id="featuresTab">
+        <div class="form-group">
+          <label class="toggle">
+            <input type="checkbox" class="toggle__input" id="voiceEnabled" checked>
+            <span class="toggle__slider"></span>
+            <span class="toggle__label">🎤 Voice Input</span>
+          </label>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">Whisper GPU Server URL</label>
+          <input type="text" class="input" id="whisperUrl" placeholder="http://192.168.x.x:8001">
+          <span class="form-help">Leave empty for local CPU processing</span>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">View Mode</label>
+          <select class="select" id="viewMode">
+            <option value="auto">🔄 Auto</option>
+            <option value="desktop">🖥️ Desktop</option>
+            <option value="mobile">📱 Mobile</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">⏱️ Code Execution Timeout (seconds)</label>
+          <input type="number" class="input" id="executionTimeout" min="0" max="3600" value="30">
+          <span class="form-help">0 = unlimited. Max recommended: 300s (5 min)</span>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">🔧 Auto-Fix Max Attempts</label>
+          <input type="number" class="input" id="autoFixMaxAttempts" min="1" max="20" value="10">
+          <span class="form-help">How many times to retry fixing code errors (1-20)</span>
+        </div>
+      </div>
+      
+      <!-- Prompts Tab -->
+      <div class="tab-panel" id="promptsTab">
+        <div class="form-group">
+          <label class="form-label">System Prompt</label>
+          <textarea class="textarea" id="systemPrompt" rows="8" placeholder="System prompt for AI..."></textarea>
+          <span class="form-help">The instructions given to the AI for code generation</span>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">Auto-Fix Prompt Template</label>
+          <textarea class="textarea" id="autoFixPrompt" rows="6" placeholder="Template for auto-fix..."></textarea>
+          <span class="form-help">Use {errors} as placeholder for error details</span>
+        </div>
+      </div>
+      
+      <!-- Docker Tab -->
+      <div class="tab-panel" id="dockerTab">
+        <div class="form-group">
+          <label class="form-label">CPU Cores</label>
+          <input type="number" class="input" id="dockerCpus" min="1" max="16" value="2">
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">Memory Limit</label>
+          <input type="text" class="input" id="dockerMemory" placeholder="8g" value="8g">
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">Storage Limit</label>
+          <select class="select" id="dockerStorage">
+            <option value="5g">5 GB</option>
+            <option value="10g" selected>10 GB</option>
+            <option value="20g">20 GB</option>
+            <option value="50g">50 GB</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">Execution Timeout (seconds)</label>
+          <input type="number" class="input" id="dockerTimeout" min="0" value="30">
+          <span class="form-help">0 = unlimited</span>
+        </div>
+        
+        <div class="card" style="margin-top: var(--space-6);">
+          <div class="card__header">
+            <span class="card__title">Active Containers</span>
+            <button class="btn btn--sm btn--danger" id="cleanupContainersBtn">🗑️ Cleanup</button>
+          </div>
+          <div class="card__body" id="containerList">
+            <div class="empty-state">
+              <div class="empty-state__text">No active containers</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <footer class="modal__footer">
+      <button class="btn" id="cancelSettingsBtn">Cancel</button>
+      <button class="btn btn--primary" id="saveSettingsBtn">Save Settings</button>
+    </footer>
+  </div>
+
+  <!-- Terminal Modal -->
+  <div class="terminal-modal" id="terminalModal">
+    <div class="terminal-container" id="terminalContainer">
+      <header class="terminal-header" id="terminalHeader">
+        <div class="terminal-title">🖥️ Terminal</div>
+        <div class="terminal-tabs" id="terminalTabs"></div>
+        <div class="terminal-controls">
+          <button class="btn-icon btn-icon--sm" id="minimizeTermBtn">−</button>
+          <button class="btn-icon btn-icon--sm" id="maximizeTermBtn">□</button>
+          <button class="btn-icon btn-icon--sm" id="closeTermBtn">✕</button>
+        </div>
+      </header>
+      <div class="terminal-content" id="terminalContent"></div>
+      <div class="terminal-resize" id="terminalResize"></div>
+    </div>
+  </div>
+
+  <!-- File Viewer Modal -->
+  <div class="modal-backdrop" id="fileViewerBackdrop"></div>
+  <div class="modal modal--lg" id="fileViewerModal">
+    <header class="modal__header">
+      <h2 class="modal__title" id="fileViewerTitle">File</h2>
+      <div class="flex gap-2">
+        <button class="btn btn--sm" id="downloadFileBtn">⬇️ Download</button>
+        <button class="btn-icon btn-icon--sm" id="closeFileViewerBtn">✕</button>
+      </div>
+    </header>
+    <div class="modal__body">
+      <pre class="code-block"><code id="fileViewerContent"></code></pre>
+    </div>
+  </div>
+
+  <!-- Transcription Preview -->
+  <div class="transcription-preview" id="transcriptionPreview" style="display: none;">
+    <div class="transcription-header">
+      <span class="badge" id="transcriptionLang"></span>
+      <button class="btn-icon btn-icon--sm" id="closeTranscriptionBtn">✕</button>
+    </div>
+    <div class="transcription-content">
+      <div class="transcription-original" id="transcriptionOriginal"></div>
+      <div class="transcription-english" id="transcriptionEnglish"></div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="/app.js"></script>
+</body>
+</html>

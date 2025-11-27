@@ -1,0 +1,86 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# Environment variables
+.env
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Docker
+.docker/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.bak
+*.cache
+
+# Node modules (if any frontend tooling)
+node_modules/
+
+# Deployment scripts
+push.sh
+
+# Archives
+*.tar.gz
+*.zip
+
+# Git helper scripts (local development only)
+PUSH_*.txt
+PUSH_*.md
+COMMIT_*.txt
+FINAL_*.txt
+FIX_*.sh
+HOW_TO_*.md
+WHY_*.md
+READY_*.txt
+REAL_*.txt
+push_to_github.sh
+*_PUSH_*.txt
+*_PUSH_*.md
+
+# Migration helper files (local only)
+MIGRATE_*.sh
+RESTRUCTURE_*.txt
+STRUCTURE_*.txt
+NEW_STRUCTURE_*.md
+
+# Development helpers
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Archives
+*.tar.gz
+*.zip
+
+# Backup files
+*.backup
