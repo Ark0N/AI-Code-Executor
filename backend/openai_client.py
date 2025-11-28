@@ -72,24 +72,34 @@ class OpenAIClient:
         system_prompt: str = None
     ) -> AsyncGenerator[str, None]:
         """Stream response (alias for generate_stream with system message injection)"""
-        # Inject system message if not present
-        has_system = any(msg.get('role') == 'system' for msg in messages)
-        if not has_system:
-            if system_prompt is None:
-                system_prompt = os.getenv("SYSTEM_PROMPT",
-                    "You are a professional coder who provides complete, executable code solutions. "
-                    "Present only code, no explanatory text or instructions on how to execute. "
-                    "Present code blocks in the order they should be executed. "
-                    "If dependencies are needed, install them first using a bash script. "
-                    "This approach gives the best results for automatic code execution."
-                )
-            system_msg = {
+        # Default system prompt
+        if system_prompt is None:
+            system_prompt = os.getenv("SYSTEM_PROMPT",
+                "You are a professional coder who provides complete, executable code solutions. "
+                "Present only code, no explanatory text or instructions on how to execute. "
+                "Present code blocks in the order they should be executed. "
+                "If dependencies are needed, install them first using a bash script. "
+                "This approach gives the best results for automatic code execution."
+            )
+        
+        # Format messages with system prompt first
+        openai_messages = []
+        
+        # Add system message if provided
+        if system_prompt:
+            openai_messages.append({
                 "role": "system",
                 "content": system_prompt
-            }
-            messages = [system_msg] + messages
+            })
         
-        async for chunk in self.generate_stream(model, messages, max_tokens, temperature):
+        # Add conversation messages
+        for msg in messages:
+            openai_messages.append({
+                "role": msg["role"],
+                "content": msg["content"]
+            })
+        
+        async for chunk in self.generate_stream(model, openai_messages, max_tokens, temperature):
             yield chunk
     
     def get_available_models(self) -> list:

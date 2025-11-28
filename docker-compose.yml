@@ -55,6 +55,10 @@ services:
       # Use host.docker.internal to reach Ollama running on host
       - OLLAMA_HOST=${OLLAMA_HOST:-http://host.docker.internal:11434}
       
+      # LM Studio (optional - for local AI models)
+      # Use host.docker.internal to reach LM Studio running on host
+      - LMSTUDIO_HOST=${LMSTUDIO_HOST:-http://host.docker.internal:1234}
+      
       # Whisper (optional - for voice input)
       - WHISPER_SERVER_URL=${WHISPER_SERVER_URL:-}
     

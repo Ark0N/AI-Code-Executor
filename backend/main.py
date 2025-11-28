@@ -27,6 +27,7 @@ import docker
 from backend.database import init_db, get_session, Conversation, Message, CodeExecution, File, Settings, ExecutionLog
 from backend.anthropic_client import claude_client
 from backend.ollama_client import OllamaClient
+from backend.lmstudio_client import LMStudioClient
 from backend.code_executor import executor, CodeExecutor
 
 # Whisper client - check if remote GPU server is configured
@@ -56,6 +57,9 @@ async def get_whisper_client(db: AsyncSession):
 
 # Initialize Ollama client
 ollama_client = OllamaClient()
+
+# Initialize LM Studio client
+lmstudio_client = LMStudioClient()
 
 app = FastAPI(title="Claude Code Executor")
 
@@ -99,6 +103,14 @@ async def startup_event():
         print(f"✓ Ollama detected with {len(models)} model(s): {', '.join(models[:3])}")
     else:
         print("⚠ Ollama not detected (optional - Claude API will be used)")
+    
+    # Check LM Studio availability
+    await lmstudio_client.check_availability()
+    if lmstudio_client.available:
+        models = lmstudio_client.get_available_models()
+        print(f"✓ LM Studio detected with {len(models)} model(s): {', '.join(models[:3]) if models else 'none loaded'}")
+    else:
+        print(f"⚠ LM Studio not detected at {lmstudio_client.base_url} (optional)")
     
     # Build Docker image if not exists
     try:
@@ -285,7 +297,8 @@ async def get_providers():
         }
     ]
     
-    # Add Ollama if available
+    # Add Ollama if available (refresh models list)
+    await ollama_client.check_availability()
     if ollama_client.available:
         ollama_models = ollama_client.get_available_models()
         providers.append({
@@ -295,6 +308,20 @@ async def get_providers():
             "models": [
                 {"id": model, "name": model}
                 for model in ollama_models
+            ]
+        })
+    
+    # Add LM Studio if available (refresh models list)
+    await lmstudio_client.check_availability()
+    if lmstudio_client.available:
+        lmstudio_models = lmstudio_client.get_available_models()
+        providers.append({
+            "id": "lmstudio",
+            "name": "LM Studio (Local)",
+            "available": True,
+            "models": [
+                {"id": model, "name": model}
+                for model in lmstudio_models
             ]
         })
     
@@ -328,6 +355,25 @@ async def get_ollama_models(db: AsyncSession = Depends(get_session)):
         return {"models": models}
     except Exception as e:
         return {"models": [], "error": str(e)}
+
+
+@app.get("/api/models/lmstudio")
+async def get_lmstudio_models(db: AsyncSession = Depends(get_session)):
+    """Get available LM Studio models"""
+    try:
+        # Get LM Studio host from settings
+        result = await db.execute(
+            select(Settings).where(Settings.key == "lmstudio_host")
+        )
+        setting = result.scalar_one_or_none()
+        lmstudio_host = setting.value if setting else os.getenv("LMSTUDIO_HOST", "http://localhost:1234")
+        
+        # Create client with correct host
+        client = LMStudioClient(base_url=lmstudio_host)
+        models = await client.list_models()
+        return {"models": models, "available": client.available, "host": lmstudio_host}
+    except Exception as e:
+        return {"models": [], "error": str(e), "available": False}
 
 
 @app.post("/api/conversations")
@@ -1440,6 +1486,9 @@ async def get_settings(db: AsyncSession = Depends(get_session)):
     if "ollama_host" not in settings_dict:
         settings_dict["ollama_host"] = os.getenv("OLLAMA_HOST", "http://localhost:11434")
     
+    if "lmstudio_host" not in settings_dict:
+        settings_dict["lmstudio_host"] = os.getenv("LMSTUDIO_HOST", "http://localhost:1234")
+    
     if "whisper_server_url" not in settings_dict:
         settings_dict["whisper_server_url"] = os.getenv("WHISPER_SERVER_URL", "")
     
@@ -1452,7 +1501,7 @@ async def update_settings(settings: dict, db: AsyncSession = Depends(get_session
 
     
     # Validate settings
-    allowed_keys = ["docker_cpus", "docker_memory", "docker_storage", "docker_timeout", "anthropic_key", "openai_key", "gemini_key", "ollama_host", "whisper_server_url", "whisper_url", "voice_enabled", "view_mode", "system_prompt", "auto_fix_prompt", "auto_fix_max_attempts", "docker_export_path"]
+    allowed_keys = ["docker_cpus", "docker_memory", "docker_storage", "docker_timeout", "anthropic_key", "openai_key", "gemini_key", "ollama_host", "lmstudio_host", "whisper_server_url", "whisper_url", "voice_enabled", "view_mode", "system_prompt", "auto_fix_prompt", "auto_fix_max_attempts", "docker_export_path"]
     for key in settings.keys():
         if key not in allowed_keys:
             raise HTTPException(status_code=400, detail=f"Invalid setting key: {key}")
@@ -1618,6 +1667,7 @@ class AIClientManager:
         self.openai_client = None
         self.gemini_client = None
         self.ollama_client = OllamaClient()
+        self.lmstudio_client = None
         
     async def get_client_for_model(self, model: str, db: AsyncSession):
         """Get appropriate client based on model name"""
@@ -1671,6 +1721,14 @@ class AIClientManager:
             
         elif model.startswith('ollama:'):
             return self.ollama_client, 'ollama', model
+        
+        elif model.startswith('lmstudio:'):
+            # Get LM Studio host from settings
+            lmstudio_host = settings.get('lmstudio_host') or os.getenv("LMSTUDIO_HOST", "http://localhost:1234")
+            if not self.lmstudio_client or self.lmstudio_client.base_url != lmstudio_host:
+                self.lmstudio_client = LMStudioClient(base_url=lmstudio_host)
+                await self.lmstudio_client.check_availability()
+            return self.lmstudio_client, 'lmstudio', model
             
         else:
             raise HTTPException(status_code=400, detail=f"Unknown model: {model}")

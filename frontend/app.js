@@ -418,6 +418,7 @@ const State = {
     currentProvider: 'anthropic',
     currentModel: 'claude-sonnet-4-20250514',
     ollamaModels: [],
+    lmstudioModels: [],
     
     // Settings
     settings: {
@@ -531,6 +532,7 @@ const State = {
       currentProvider: 'anthropic',
       currentModel: 'claude-sonnet-4-20250514',
       ollamaModels: [],
+      lmstudioModels: [],
       settings: {
         dockerCpus: '2',
         dockerMemory: '8g',
@@ -588,6 +590,12 @@ const ProviderModels = {
     icon: '🏠',
     models: {},
     default: null
+  },
+  lmstudio: {
+    name: 'LM Studio',
+    icon: '💻',
+    models: {},
+    default: null
   }
 };
 
@@ -606,6 +614,11 @@ function getModelDisplayName(modelId) {
     return modelId.replace('ollama:', '').replace(':latest', '');
   }
   
+  // Handle LM Studio models
+  if (modelId.startsWith('lmstudio:')) {
+    return modelId.replace('lmstudio:', '');
+  }
+  
   return modelId;
 }
 
@@ -617,6 +630,7 @@ function getProviderForModel(modelId) {
   if (modelId.startsWith('gpt-')) return 'openai';
   if (modelId.startsWith('gemini-')) return 'gemini';
   if (modelId.startsWith('ollama:')) return 'ollama';
+  if (modelId.startsWith('lmstudio:')) return 'lmstudio';
   return 'anthropic';
 }
 
@@ -773,6 +787,10 @@ const API = {
   
   async getOllamaModels() {
     return this.request('/api/models/ollama');
+  },
+  
+  async getLmstudioModels() {
+    return this.request('/api/models/lmstudio');
   },
   
   // -------------------------
@@ -1270,6 +1288,7 @@ window.Sidebar = Sidebar;
 const Header = {
   elements: {},
   ollamaModels: [],
+  lmstudioModels: [],
   
   /**
    * Initialize header
@@ -1291,6 +1310,9 @@ const Header = {
     
     // Try to load Ollama models in background
     this.loadOllamaModels();
+    
+    // Try to load LM Studio models in background
+    this.loadLmstudioModels();
     
     // Check whisper status
     this.checkWhisperStatus();
@@ -1389,7 +1411,7 @@ const Header = {
     if (models.length === 0) {
       const option = document.createElement('option');
       option.value = '';
-      option.textContent = provider === 'ollama' ? 'Loading models...' : 'No models available';
+      option.textContent = (provider === 'ollama' || provider === 'lmstudio') ? 'Loading models...' : 'No models available';
       modelSelect.appendChild(option);
       return;
     }
@@ -1461,6 +1483,16 @@ const Header = {
           };
         });
       
+      case 'lmstudio':
+        return this.lmstudioModels.map(m => {
+          // Handle both string and object formats
+          const modelName = typeof m === 'string' ? m : (m.id || m.name);
+          return {
+            id: `lmstudio:${modelName}`,
+            name: modelName
+          };
+        });
+      
       default:
         return [];
     }
@@ -1492,6 +1524,35 @@ const Header = {
     } catch (error) {
       console.warn('Ollama not available:', error.message);
       this.ollamaModels = [];
+    }
+  },
+  
+  /**
+   * Load LM Studio models from API
+   */
+  async loadLmstudioModels() {
+    try {
+      const response = await API.getLmstudioModels();
+      
+      // Handle different response formats
+      if (Array.isArray(response)) {
+        this.lmstudioModels = response;
+      } else if (response && response.models) {
+        this.lmstudioModels = response.models;
+      } else {
+        this.lmstudioModels = [];
+      }
+      
+      console.log('LM Studio models loaded:', this.lmstudioModels.length);
+      
+      // If currently on LM Studio, refresh the dropdown
+      if (State.get('currentProvider') === 'lmstudio') {
+        this.onProviderChange('lmstudio');
+      }
+      
+    } catch (error) {
+      console.warn('LM Studio not available:', error.message);
+      this.lmstudioModels = [];
     }
   },
   
@@ -1534,6 +1595,8 @@ const Header = {
       provider = 'gemini';
     } else if (model.startsWith('ollama:')) {
       provider = 'ollama';
+    } else if (model.startsWith('lmstudio:')) {
+      provider = 'lmstudio';
     }
     
     // Set provider (this populates models)
@@ -3887,6 +3950,7 @@ const Settings = {
       openaiKey: $('#openaiKey'),
       geminiKey: $('#geminiKey'),
       ollamaHost: $('#ollamaHost'),
+      lmstudioHost: $('#lmstudioHost'),
       toggleAnthropicKey: $('#toggleAnthropicKey'),
       toggleOpenaiKey: $('#toggleOpenaiKey'),
       toggleGeminiKey: $('#toggleGeminiKey'),
@@ -3973,7 +4037,7 @@ const Settings = {
    * Populate form with settings
    */
   populateForm(settings) {
-    const { anthropicKey, openaiKey, geminiKey, ollamaHost,
+    const { anthropicKey, openaiKey, geminiKey, ollamaHost, lmstudioHost,
             voiceEnabled, whisperUrl, viewMode, executionTimeout, autoFixMaxAttempts, systemPrompt, autoFixPrompt,
             dockerCpus, dockerMemory, dockerStorage, dockerExportPath, dockerTimeout } = this.elements;
     
@@ -3982,6 +4046,7 @@ const Settings = {
     if (openaiKey) openaiKey.value = settings.openai_key || '';
     if (geminiKey) geminiKey.value = settings.gemini_key || '';
     if (ollamaHost) ollamaHost.value = settings.ollama_host || 'http://localhost:11434';
+    if (lmstudioHost) lmstudioHost.value = settings.lmstudio_host || 'http://localhost:1234';
     
     // Features
     if (voiceEnabled) voiceEnabled.checked = settings.voice_enabled !== false;
@@ -4035,7 +4100,7 @@ Provide the corrected code in a code block.`;
    * Save settings
    */
   async save() {
-    const { anthropicKey, openaiKey, geminiKey, ollamaHost,
+    const { anthropicKey, openaiKey, geminiKey, ollamaHost, lmstudioHost,
             voiceEnabled, whisperUrl, viewMode, executionTimeout, autoFixMaxAttempts, systemPrompt, autoFixPrompt,
             dockerCpus, dockerMemory, dockerStorage, dockerExportPath, dockerTimeout } = this.elements;
     
@@ -4047,6 +4112,7 @@ Provide the corrected code in a code block.`;
       openai_key: openaiKey?.value || '',
       gemini_key: geminiKey?.value || '',
       ollama_host: ollamaHost?.value || 'http://localhost:11434',
+      lmstudio_host: lmstudioHost?.value || 'http://localhost:1234',
       voice_enabled: voiceEnabled?.checked ?? true,
       whisper_url: whisperUrl?.value || '',
       view_mode: viewMode?.value || 'auto',
@@ -4067,6 +4133,10 @@ Provide the corrected code in a code block.`;
       
       // Update mic button visibility
       this.updateMicButtonVisibility(settings.voice_enabled);
+      
+      // Reload local model lists in case hosts changed
+      Header.loadOllamaModels();
+      Header.loadLmstudioModels();
       
       Toast.success('Settings saved');
       this.hide();
