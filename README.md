@@ -25,6 +25,7 @@
 <img src="https://img.shields.io/badge/GPT--5.1-22d3ee?style=flat-square&logo=openai&logoColor=white&labelColor=0a0a0b" alt="GPT-5.1"/>
 <img src="https://img.shields.io/badge/Gemini_2.5-22d3ee?style=flat-square&logo=google&logoColor=white&labelColor=0a0a0b" alt="Gemini"/>
 <img src="https://img.shields.io/badge/Ollama-22d3ee?style=flat-square&logoColor=white&labelColor=0a0a0b" alt="Ollama"/>
+<img src="https://img.shields.io/badge/LM_Studio-22d3ee?style=flat-square&logoColor=white&labelColor=0a0a0b" alt="LM Studio"/>
 <img src="https://img.shields.io/badge/Whisper_Voice-22d3ee?style=flat-square&logoColor=white&labelColor=0a0a0b" alt="Whisper"/>
 <img src="https://img.shields.io/badge/FREE_Local_AI-10b981?style=flat-square&labelColor=0a0a0b" alt="Free"/>
 
@@ -212,7 +213,7 @@ Or via environment variable: `DOCKER_EXPORT_PATH=./docker_images_exported`
 
 ## 🤖 AI Providers
 
-### 5 AI Providers - Choose Your Favorite (or Use Them All!)
+### 6 AI Providers - Choose Your Favorite (or Use Them All!)
 
 <table>
 <tr>
@@ -273,7 +274,22 @@ DeepSeek Coder
 *100% Private*
 
 </td>
-<td width="20%" align="center">
+<td width="16%" align="center">
+
+**💻 LM Studio**
+
+<img src="https://img.shields.io/badge/Local_AI-6366f1?style=for-the-badge&labelColor=0a0a0b" alt="LM Studio"/>
+
+Any GGUF Model
+Qwen Coder
+DeepSeek
+Llama 3
+
+*GUI Model Manager*
+*100% FREE*
+
+</td>
+<td width="16%" align="center">
 
 **🎤 Whisper**
 
@@ -313,6 +329,43 @@ ollama pull mistral          # Fast & efficient
 - ✅ **Offline capable** - Works without internet
 - ✅ **Privacy first** - Your code never leaves your machine
 - ✅ **Custom models** - Import any GGUF model
+
+### 💻 LM Studio Integration - GUI-Based Local AI
+
+Run local AI models with a beautiful GUI for model management. Perfect if you prefer a visual interface over command-line.
+
+**Setup:**
+
+1. **Download LM Studio** from [lmstudio.ai](https://lmstudio.ai/)
+2. **Download models** using the built-in model browser
+3. **Start the server:**
+   - Go to "Local Server" tab (left sidebar)
+   - Enable **"Serve on Local Network"** for remote access
+   - Click **"Start Server"**
+4. **Configure in AI Code Executor:**
+   - Settings → LM Studio Host URL
+   - Local: `http://localhost:1234`
+   - Remote: `http://192.168.x.x:1234`
+
+**Recommended Models for Coding:**
+```
+qwen2.5-coder-32b-instruct    # Excellent for code (32B)
+deepseek-coder-v2             # Fast code specialist
+codellama-34b                 # Meta's code model
+```
+
+**LM Studio Features:**
+- ✅ **Visual model browser** - Download models with one click
+- ✅ **GPU acceleration** - Automatic CUDA/Metal detection
+- ✅ **Model parameters** - Adjust temperature, context length, etc.
+- ✅ **Chat interface** - Test models before using in app
+- ✅ **Cross-platform** - Windows, macOS, Linux
+
+**Network Access (Windows Firewall):**
+```powershell
+# Run as Administrator to allow remote connections
+New-NetFirewallRule -DisplayName "LM Studio API" -Direction Inbound -LocalPort 1234 -Protocol TCP -Action Allow
+```
 
 ### 🎤 Whisper Voice Integration
 
@@ -417,6 +470,7 @@ If dependencies are needed, install them first using a bash script.
 | 🟢 **OpenAI** (GPT) | `sk-...` | [platform.openai.com](https://platform.openai.com/) |
 | 🔵 **Google** (Gemini) | `AIza...` | [makersuite.google.com](https://makersuite.google.com/) |
 | ⚫ **Ollama** | Auto-detected | [ollama.ai](https://ollama.ai/) |
+| 💻 **LM Studio** | Auto-detected | [lmstudio.ai](https://lmstudio.ai/) |
 | 🎤 **Whisper** (Optional) | Server URL | Self-hosted |
 
 **Location:** Settings → API Keys
@@ -450,6 +504,11 @@ GEMINI_API_KEY=AIza...                 # Gemini models
 # 🦙 OLLAMA (Local AI)
 # ═══════════════════════════════════════════════════════════════════════════
 OLLAMA_HOST=http://localhost:11434     # Local or remote Ollama server
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 💻 LM STUDIO (Local AI)
+# ═══════════════════════════════════════════════════════════════════════════
+LMSTUDIO_HOST=http://localhost:1234    # Local or remote LM Studio server
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 🎤 WHISPER (Voice Input)
@@ -853,6 +912,7 @@ AI-Code-Executor/
 │   ├── openai_client.py     # GPT API integration
 │   ├── gemini_client.py     # Gemini API integration
 │   ├── ollama_client.py     # Local Ollama integration
+│   ├── lmstudio_client.py   # Local LM Studio integration
 │   ├── whisper_client.py    # Local Whisper voice input
 │   ├── whisper_remote.py    # Remote Whisper GPU server
 │   └── database.py          # SQLite async ORM
