@@ -768,6 +768,7 @@ async def send_message(
         result = await db.execute(select(Settings).where(Settings.key == "system_prompt"))
         system_prompt_setting = result.scalar_one_or_none()
         system_prompt = system_prompt_setting.value if system_prompt_setting else None
+        print(f"[SEND] System prompt loaded: {len(system_prompt) if system_prompt else 0} chars, provider will be determined by model: {conversation.model}")
         
         # Stream response from appropriate provider
         try:
@@ -1720,6 +1721,24 @@ class AIClientManager:
             return self.gemini_client, 'gemini', model
             
         elif model.startswith('ollama:'):
+            # ===== FIX: Get Ollama host from settings (like /api/models/ollama does) =====
+            ollama_host = settings.get('ollama_host') or os.getenv("OLLAMA_HOST", "http://localhost:11434")
+            
+            # Create new client with correct host if different from current
+            if ollama_host != self.ollama_client.base_url:
+                print(f"[OLLAMA] Switching host from {self.ollama_client.base_url} to {ollama_host}")
+                self.ollama_client = OllamaClient(base_url=ollama_host)
+                await self.ollama_client.check_availability()
+            
+            # Check availability if not already checked
+            if not self.ollama_client.available:
+                await self.ollama_client.check_availability()
+                if not self.ollama_client.available:
+                    raise HTTPException(
+                        status_code=503, 
+                        detail=f"Ollama is not available at {ollama_host}. Please check that Ollama is running and accessible."
+                    )
+            
             return self.ollama_client, 'ollama', model
         
         elif model.startswith('lmstudio:'):
@@ -2246,9 +2265,3 @@ async def delete_docker_image(
 
 
 app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
-
-
-
-
-
-
